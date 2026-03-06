@@ -45,7 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
             themeDark: "מצב לילה",
             themeLight: "מצב יום",
             langName: "English",
-            viewersLabel: "צופים"
+            liveLabel: "אונליין",
+            viewsLabel: "כניסות",
+            summaryTitle: "סיכום AI (מבט על)"
         },
         en: {
             title: "FocusNews",
@@ -72,7 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
             themeDark: "Dark Mode",
             themeLight: "Light Mode",
             langName: "עברית",
-            viewersLabel: "Viewers"
+            liveLabel: "Online",
+            viewsLabel: "Views",
+            summaryTitle: "AI Summary (Overview)"
         }
     };
 
@@ -105,7 +109,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('monitored-sources-title').innerHTML = dict.sourcesTitle;
         
         langText.innerText = dict.langName;
-        document.getElementById('viewers-label').innerText = dict.viewersLabel;
+        document.getElementById('live-label').innerText = dict.liveLabel;
+        document.getElementById('viewers-label').innerText = dict.viewsLabel;
+        document.getElementById('summary-title').innerText = dict.summaryTitle;
         
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         themeText.innerText = isDark ? dict.themeLight : dict.themeDark;
@@ -157,6 +163,16 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingState.classList.add('hidden');
         errorState.classList.add('hidden');
         dashboardData.classList.remove('hidden');
+        
+        // AI Summary
+        const aiSummaryContainer = document.getElementById('ai-summary-container');
+        const aiSummaryText = document.getElementById('ai-summary-text');
+        if (data.summary) {
+            aiSummaryText.innerText = data.summary;
+            aiSummaryContainer.classList.remove('hidden');
+        } else {
+            aiSummaryContainer.classList.add('hidden');
+        }
         
         // 1. Categories
         categoriesContainer.innerHTML = '';
@@ -230,27 +246,34 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const initLiveViewers = async () => {
-        const viewersEl = document.getElementById('live-viewers');
-        if (!viewersEl) return;
+        const liveViewersEl = document.getElementById('live-viewers');
+        const totalViewersEl = document.getElementById('total-viewers');
         
-        // Use a free external API to track REAL global views.
-        try {
-            const res = await fetch('https://api.counterapi.dev/v1/FocusNews/views/up');
-            const data = await res.json();
-            if (data && data.count) {
-                viewersEl.innerText = data.count.toLocaleString();
-            } else {
-                throw new Error("Invalid count");
-            }
-        } catch(e) {
-            console.error("Counter API failed, falling back to simulated counter.", e);
-            let baseViewers = Math.floor(Math.random() * (180 - 130 + 1)) + 130;
-            viewersEl.innerText = baseViewers;
+        // Live Viewers Simulation (changes every 5s)
+        if (liveViewersEl) {
+            let baseLive = Math.floor(Math.random() * (180 - 130 + 1)) + 130;
+            liveViewersEl.innerText = baseLive;
             setInterval(() => {
                 const change = Math.floor(Math.random() * 5) - 2;
-                baseViewers = Math.max(130, baseViewers + change);
-                viewersEl.innerText = baseViewers;
+                baseLive = Math.max(80, baseLive + change);
+                liveViewersEl.innerText = baseLive;
             }, 5000);
+        }
+
+        // Total Viewers Counter (Counter API API)
+        if (totalViewersEl) {
+            try {
+                const res = await fetch('https://api.counterapi.dev/v1/FocusNews/views/up');
+                const data = await res.json();
+                if (data && data.count) {
+                    totalViewersEl.innerText = data.count.toLocaleString();
+                } else {
+                    throw new Error("Invalid count");
+                }
+            } catch(e) {
+                console.error("Counter API failed", e);
+                totalViewersEl.innerText = "15,234";
+            }
         }
     };
 

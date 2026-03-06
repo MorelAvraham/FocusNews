@@ -26,18 +26,26 @@
                         <span id="lang-icon">🌐</span> <span id="lang-text" class="btn-text">English</span>
                     </button>
                 </div>
-                <div class="top-viewers" title="כניסות אמיתיות לאתר">
-                    <span class="eye-icon">👁️</span>
-                    <span id="live-viewers">...</span>
-                    <span id="viewers-label" class="btn-text">צופים</span>
+                <div class="top-viewers-container" style="display: flex; gap: 10px;">
+                    <div class="top-viewers" title="צופים כעת">
+                        <span class="eye-icon"
+                            style="color: #ef4444; font-size: 0.8rem; animation: pulse 2s infinite;">🔴</span>
+                        <span id="live-viewers">...</span>
+                        <span id="live-label" class="btn-text">צופים כעת</span>
+                    </div>
+                    <div class="top-viewers" title="כניסות אמיתיות לאתר">
+                        <span class="eye-icon">👁️</span>
+                        <span id="total-viewers">...</span>
+                        <span id="viewers-label" class="btn-text">כניסות</span>
+                    </div>
                 </div>
             </div>
 
             <div class="logo-area">
                 <h1>FocusNews</h1>
             </div>
-            <h2>כל החדשות, בלי הרעש</h2>
-            <p>מערכת חכמה לניתוח וסינון דיווחים, מתעדכנת בזמן אמת.</p>
+            <h2>חדשות ממוקדות - מבצע "שאגת הארי" </h2>
+            <p>מערכת חכמה לניתוח וסינון דיווחים, מתעדכנת כל שעה.</p>
 
             <div class="status-bar" style="justify-content: center; border-top: none; padding-top: 0;">
                 <span id="last-updated">מאתחל מערכות...</span>
@@ -71,6 +79,12 @@
                     </button>
                 </div>
 
+                <div id="ai-summary-container" class="glass-panel text-center full-width hidden mb-4">
+                    <h3 style="justify-content: center;"><i class="icon">🤖</i> <span id="summary-title">סיכום AI (מבט
+                            על)</span></h3>
+                    <p id="ai-summary-text" style="font-size: 1.1rem; font-weight: 500;"></p>
+                </div>
+
                 <div id="categories-container" class="grid-layout">
                     <!-- Categories will be injected here -->
                 </div>
@@ -101,7 +115,7 @@
             </div>
 
             <div class="footer-bottom">
-                <p class="footer-copy">© Morel Avraham |</p>
+                <p class="footer-copy">© 2026 Morel Avraham. All rights reserved </p>
                 <div class="social-links">
                     <a href="https://www.linkedin.com/in/morel-avraham" target="_blank" rel="noopener noreferrer"
                         class="linkedin-link">

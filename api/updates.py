@@ -121,9 +121,10 @@ class handler(BaseHTTPRequestHandler):
         
         prompt_hebrew = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
 Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, and provide a clean, categorized news summary in HEBREW.
-For the timeline, you MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
+For the timeline, select the 3-5 most interesting, critical, or breaking news events from the last hour. You MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
 Output MUST be ONLY a valid JSON object matching this exact schema:
 {{
+  "summary": "2-3 sentences summarizing the overall news situation from the past hour in Hebrew.",
   "categories": [
     {{
       "name": "ביטחון" | "פוליטיקה" | "כלכלה" | "כללי",
@@ -131,7 +132,7 @@ Output MUST be ONLY a valid JSON object matching this exact schema:
     }}
   ],
   "timeline": [
-    {{"time": "HH:MM", "source": "channel_name", "event": "Short description"}}
+    {{"time": "HH:MM", "source": "channel_name", "event": "Short description of a particularly interesting or critical event in Hebrew"}}
   ]
 }}
 
@@ -141,9 +142,10 @@ Raw intercept data:
 
         prompt_english = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
 Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, translate it all to ENGLISH, and provide a clean, categorized news summary in ENGLISH.
-For the timeline, you MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
+For the timeline, select the 3-5 most interesting, critical, or breaking news events from the last hour. You MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
 Output MUST be ONLY a valid JSON object matching this exact schema:
 {{
+  "summary": "2-3 sentences summarizing the overall news situation from the past hour in English.",
   "categories": [
     {{
       "name": "Security" | "Politics" | "Economy" | "General",
@@ -151,7 +153,7 @@ Output MUST be ONLY a valid JSON object matching this exact schema:
     }}
   ],
   "timeline": [
-    {{"time": "HH:MM", "source": "channel_name", "event": "Short description"}}
+    {{"time": "HH:MM", "source": "channel_name", "event": "Short description of a particularly interesting or critical event in English"}}
   ]
 }}
 
