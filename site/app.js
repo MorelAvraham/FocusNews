@@ -7,11 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessage = document.getElementById('error-message');
     const dashboardData = document.getElementById('dashboard-data');
     
-    const statusPulse = document.getElementById('status-pulse');
     const statusBadge = document.getElementById('status-badge');
-    const mainSummary = document.getElementById('main-summary');
-    const criticalEvents = document.getElementById('critical-events');
+    const categoriesContainer = document.getElementById('categories-container');
     const timeline = document.getElementById('timeline');
+    
+    const shareWhatsappBtn = document.getElementById('share-whatsapp-btn');
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
 
     // Display mappings for nice Hebrew names
     const channelMap = {
@@ -57,9 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardData.classList.add('hidden');
         errorState.classList.add('hidden');
         loadingState.classList.remove('hidden');
-        statusBadge.innerText = 'מבודד ומעבד...';
+        statusBadge.innerText = 'מחשב נתונים...';
         statusBadge.className = 'badge badge-loading';
-        statusPulse.className = 'pulse-dot pulse-loading';
     };
 
     const showError = (msg) => {
@@ -69,7 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
         errorMessage.innerText = msg;
         statusBadge.innerText = 'שגיאת שרת';
         statusBadge.className = 'badge badge-error';
-        statusPulse.className = 'pulse-dot pulse-error';
     };
 
     const renderDashboard = (data) => {
@@ -81,39 +81,53 @@ document.addEventListener('DOMContentLoaded', () => {
         let status = data.status_level || 'שגרה';
         statusBadge.innerText = status;
         
-        let badgeClass = 'badge-normal';
-        let pulseClass = 'pulse-normal';
-        
-        if(status === 'שגרה') {
-            badgeClass = 'badge-routine'; pulseClass = 'pulse-routine';
-        } else if(status === 'מתיחות') {
-            badgeClass = 'badge-tension'; pulseClass = 'pulse-tension';
-        } else if(status === 'הסלמה') {
-            badgeClass = 'badge-escalation'; pulseClass = 'pulse-escalation';
-        } else if(status === 'לחימה עצימה') {
-            badgeClass = 'badge-combat'; pulseClass = 'pulse-combat';
+        let badgeClass = 'badge-routine';
+        if(status === 'תנועה ערה' || status === 'מתיחות') {
+            badgeClass = 'badge-tension';
+        } else if(status === 'עומס דיווחים' || status === 'הסלמה') {
+            badgeClass = 'badge-escalation';
         }
         
         statusBadge.className = `badge ${badgeClass}`;
-        statusPulse.className = `pulse-dot ${pulseClass}`;
         
-        // 2. Executive Summary
-        mainSummary.innerText = data.main_summary || "לא התקבל סיכום מידע תקין מהמודל.";
-        
-        // 3. Critical Events
-        criticalEvents.innerHTML = '';
-        if(data.critical_events && data.critical_events.length > 0) {
-            data.critical_events.forEach(event => {
-                const li = document.createElement('li');
-                li.innerText = event;
-                criticalEvents.appendChild(li);
+        // 2. Categories
+        categoriesContainer.innerHTML = '';
+        if(data.categories && data.categories.length > 0) {
+            data.categories.forEach(cat => {
+                const section = document.createElement('section');
+                section.className = 'glass-panel category-section';
+                
+                const iconMap = {
+                    'ביטחון': '🛡️',
+                    'פוליטיקה': '🏛️',
+                    'כלכלה': '📈',
+                    'חינוך': '📚',
+                    'בריאות': '🏥',
+                    'כללי': '📰'
+                };
+                const catIcon = iconMap[cat.name] || '📰';
+                
+                let listHtml = '';
+                if(cat.items && cat.items.length > 0) {
+                    cat.items.forEach(item => {
+                        listHtml += `<li>${item}</li>`;
+                    });
+                } else {
+                    listHtml = `<li style="color:var(--text-secondary); border-color:transparent;">אין עדכונים חריגים</li>`;
+                }
+                
+                section.innerHTML = `
+                    <h3><i class="icon">${catIcon}</i> ${cat.name}</h3>
+                    <ul class="category-list">${listHtml}</ul>
+                `;
+                categoriesContainer.appendChild(section);
             });
         } else {
-            const li = document.createElement('li');
-            li.innerText = "לא נרשמו אירועים חריגים.";
-            li.style.color = "var(--text-secondary)";
-            li.style.borderRightColor = "var(--text-secondary)";
-            criticalEvents.appendChild(li);
+            categoriesContainer.innerHTML = `
+                <div class="glass-panel text-center full-width">
+                    <p style="color:var(--text-secondary);">לא נמצאו דיווחים חדשים לחלוקה לקטגוריות.</p>
+                </div>
+            `;
         }
         
         // 4. Verified Timeline
@@ -165,7 +179,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     refreshBtn.addEventListener('click', fetchUpdates);
 
+    const initTheme = () => {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            themeIcon.innerText = '☀️';
+        } else {
+            themeIcon.innerText = '🌙';
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            if (currentTheme === 'dark') {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+                themeIcon.innerText = '🌙';
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                themeIcon.innerText = '☀️';
+            }
+        });
+    };
+
+    const shareToWhatsapp = () => {
+        const url = window.location.href;
+        let text = "עדכוני FocusNews בשעה האחרונה:\n\n";
+        
+        const categories = document.querySelectorAll('.category-section');
+        let itemCount = 0;
+        
+        categories.forEach(cat => {
+            const title = cat.querySelector('h3').innerText;
+            const items = cat.querySelectorAll('li');
+            if(items.length > 0 && items[0].innerText !== "אין עדכונים חריגים" && itemCount < 3) {
+                text += `*${title.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').trim()}*\n- ${items[0].innerText}\n\n`;
+                itemCount++;
+            }
+        });
+        
+        text += `לכל הדיווחים אונליין: ${url}`;
+        const encodedText = encodeURIComponent(text);
+        window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+    };
+
+    if (shareWhatsappBtn) {
+        shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
+    }
+
     // Initial load
+    initTheme();
     initLiveViewers();
     fetchUpdates();
 });

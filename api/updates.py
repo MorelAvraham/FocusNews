@@ -72,8 +72,9 @@ class handler(BaseHTTPRequestHandler):
         if not all_messages:
             fallback = {
                 "status_level": "שגרה",
-                "main_summary": "לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים.",
-                "critical_events": [],
+                "categories": [
+                    {"name": "כללי", "items": ["לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים."]}
+                ],
                 "timeline": []
             }
             self.send_json(fallback)
@@ -106,13 +107,17 @@ class handler(BaseHTTPRequestHandler):
             
         genai.configure(api_key=api_key)
         
-        prompt = f"""You are an elite Israeli intelligence analyst assigned to the 'Lion's Roar' (שאגת הארי) operation.
-Your task is to review the raw Telegram intelligence intercepts from the last hour, cross-reference them, remove duplicates and noise, and provide a verified intelligence summary.
+        prompt = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
+Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, and provide a clean, categorized news summary in Hebrew.
 Output MUST be ONLY a valid JSON object matching this exact schema:
 {{
-  "status_level": "שגרה" | "מתיחות" | "הסלמה" | "לחימה עצימה",
-  "main_summary": "A 2-3 sentence executive summary of the last hour in Hebrew.",
-  "critical_events": ["list of strings for high-priority events in Hebrew, if any"],
+  "status_level": "שגרה" | "תנועה ערה" | "עומס דיווחים",
+  "categories": [
+    {{
+      "name": "ביטחון" | "פוליטיקה" | "כלכלה" | "כללי",
+      "items": ["list of short strings summarizing key distinct news items in this category"]
+    }}
+  ],
   "timeline": [
     {{"time": "HH:MM", "source": "channel_name", "event": "Short description"}}
   ]
