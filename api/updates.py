@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import os
 import google.generativeai as genai
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse, parse_qs
 
 def fetch_telegram_messages(channel):
     url = f"https://t.me/s/{channel}"
@@ -60,6 +61,9 @@ def fetch_telegram_messages(channel):
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        query_components = parse_qs(urlparse(self.path).query)
+        lang = query_components.get('lang', ['he'])[0]
+        
         channels = [
             "abualiexpress", "amitsegal", "miraedj", "ziv710",
             "salehdesk1", "arabworld301news", "GLOBAL_Telegram_MOKED", "New_security8200"
@@ -70,13 +74,22 @@ class handler(BaseHTTPRequestHandler):
             all_messages.extend(fetch_telegram_messages(c))
             
         if not all_messages:
-            fallback = {
-                "status_level": "שגרה",
-                "categories": [
-                    {"name": "כללי", "items": ["לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים."]}
-                ],
-                "timeline": []
-            }
+            if lang == 'en':
+                fallback = {
+                    "status_level": "Routine",
+                    "categories": [
+                        {"name": "General", "items": ["No new reports gathered in the last hour from monitored sources."]}
+                    ],
+                    "timeline": []
+                }
+            else:
+                fallback = {
+                    "status_level": "שגרה",
+                    "categories": [
+                        {"name": "כללי", "items": ["לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים."]}
+                    ],
+                    "timeline": []
+                }
             self.send_json(fallback)
             return
 
@@ -107,8 +120,8 @@ class handler(BaseHTTPRequestHandler):
             
         genai.configure(api_key=api_key)
         
-        prompt = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
-Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, and provide a clean, categorized news summary in Hebrew.
+        prompt_hebrew = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
+Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, and provide a clean, categorized news summary in HEBREW.
 Output MUST be ONLY a valid JSON object matching this exact schema:
 {{
   "status_level": "שגרה" | "תנועה ערה" | "עומס דיווחים",
@@ -126,6 +139,28 @@ Output MUST be ONLY a valid JSON object matching this exact schema:
 Raw intercept data:
 {combined_text}
 """
+
+        prompt_english = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
+Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, translate it all to ENGLISH, and provide a clean, categorized news summary in ENGLISH.
+Output MUST be ONLY a valid JSON object matching this exact schema:
+{{
+  "status_level": "Routine" | "Active" | "Heavy Activity",
+  "categories": [
+    {{
+      "name": "Security" | "Politics" | "Economy" | "General",
+      "items": ["list of short strings summarizing key distinct news items in this category"]
+    }}
+  ],
+  "timeline": [
+    {{"time": "HH:MM", "source": "channel_name", "event": "Short description"}}
+  ]
+}}
+
+Raw intercept data:
+{combined_text}
+"""
+        
+        prompt = prompt_english if lang == 'en' else prompt_hebrew
         try:
             model = genai.GenerativeModel('gemini-2.5-flash')
             response = model.generate_content(

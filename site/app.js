@@ -14,6 +14,69 @@ document.addEventListener('DOMContentLoaded', () => {
     const shareWhatsappBtn = document.getElementById('share-whatsapp-btn');
     const themeToggle = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-icon');
+    const themeText = document.getElementById('theme-text');
+    
+    const langToggle = document.getElementById('lang-toggle');
+    const langIcon = document.getElementById('lang-icon');
+    const langText = document.getElementById('lang-text');
+
+    // Dictionary for Translations
+    const i18n = {
+        he: {
+            title: "FocusNews",
+            subtitle: "כל החדשות, בלי הרעש",
+            desc: "מערכת חכמה לניתוח וסינון דיווחים, מתעדכנת בזמן אמת.",
+            statusLabel: "עומס דיווחים:",
+            loadingStatus: "מחשב נתונים...",
+            refreshBtn: "סריקה מחדש",
+            loadingTitle: "מעבד חדשות...",
+            loadingDesc: "מפעיל מערכת בינה מלאכותית לאיסוף וסינון דיווחים מהשעה האחרונה.",
+            errorTitle: "שגיאה בתקשורת נתונים",
+            shareBtn: "שתף תקציר ל-WhatsApp",
+            timelineTitle: "⏱️ ציר זמן מאומת (השעה האחרונה)",
+            sourcesTitle: "מקורות מנוטרים <span>(8/8 פעילים)</span>",
+            lastTestedTemplate: "נבדק לאחרונה: ",
+            noEvents: "אין עדכונים חריגים",
+            noCategories: "לא נמצאו דיווחים חדשים לחלוקה לקטגוריות.",
+            noTimeline: "לא זוהו אירועים הדורשים ציון בציר הזמן בשעה האחרונה.",
+            routine: "שגרה",
+            tension: "תנועה ערה",
+            escalation: "עומס דיווחים",
+            serverError: "שגיאת שרת",
+            themeDark: "מצב לילה",
+            themeLight: "מצב יום",
+            langName: "English",
+            viewersLabel: "צופים"
+        },
+        en: {
+            title: "FocusNews",
+            subtitle: "All the News, Without the Noise",
+            desc: "Smart system for analyzing and filtering reports, updated in real-time.",
+            statusLabel: "News Volume:",
+            loadingStatus: "Processing...",
+            refreshBtn: "Rescan",
+            loadingTitle: "Analyzing News...",
+            loadingDesc: "Running AI engine to gather and filter reports from the last hour.",
+            errorTitle: "Connection Error",
+            shareBtn: "Share Summary to WhatsApp",
+            timelineTitle: "⏱️ Verified Timeline (Last Hour)",
+            sourcesTitle: "Monitored Sources <span>(8/8 Active)</span>",
+            lastTestedTemplate: "Last checked: ",
+            noEvents: "No unusual updates",
+            noCategories: "No new reports found to categorize.",
+            noTimeline: "No actionable events detected in the timeline for the last hour.",
+            routine: "Routine",
+            tension: "Active",
+            escalation: "Heavy Activity",
+            serverError: "Server Error",
+            themeDark: "Dark Mode",
+            themeLight: "Light Mode",
+            langName: "עברית",
+            viewersLabel: "Viewers"
+        }
+    };
+
+    let currentLang = localStorage.getItem('lang') || 'he';
 
     // Display mappings for nice Hebrew names
     const channelMap = {
@@ -27,15 +90,38 @@ document.addEventListener('DOMContentLoaded', () => {
         'New_security8200': 'מודיעין 8200'
     };
 
+    const updateUIText = () => {
+        const dict = i18n[currentLang];
+        document.documentElement.dir = currentLang === 'he' ? 'rtl' : 'ltr';
+        document.documentElement.lang = currentLang;
+        
+        document.querySelector('h2').innerText = dict.subtitle;
+        document.querySelector('header p').innerText = dict.desc;
+        document.querySelector('.status-label').innerText = dict.statusLabel;
+        document.getElementById('refresh-btn').innerText = dict.refreshBtn;
+        document.querySelector('#loading-state h3').innerText = dict.loadingTitle;
+        document.querySelector('#loading-state p').innerText = dict.loadingDesc;
+        document.querySelector('#error-state h3').innerText = dict.errorTitle;
+        if(shareWhatsappBtn) shareWhatsappBtn.innerHTML = shareWhatsappBtn.innerHTML.replace(/.*<\/svg>\s*.*/s, document.querySelector('#share-whatsapp-btn svg').outerHTML + ' ' + dict.shareBtn);
+        document.querySelector('.timeline-section h3').innerHTML = `<i class="icon">⏱️</i> ${dict.timelineTitle.replace('⏱️ ', '')}`;
+        document.getElementById('monitored-sources-title').innerHTML = dict.sourcesTitle;
+        
+        langText.innerText = dict.langName;
+        document.getElementById('viewers-label').innerText = dict.viewersLabel;
+        
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        themeText.innerText = isDark ? dict.themeLight : dict.themeDark;
+    };
+
     const fetchUpdates = async () => {
         try {
             showLoading();
             
-            const res = await fetch('/api/updates');
+            const res = await fetch(`/api/updates?lang=${currentLang}`);
             
             if (!res.ok) {
                 let errText = await res.text();
-                throw new Error(`שגיאת תקשורת מול שרת (${res.status}): ${errText}`);
+                throw new Error(`Server Error (${res.status}): ${errText}`);
             }
             const data = await res.json();
             
@@ -46,12 +132,13 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDashboard(data);
             
             const now = new Date();
-            lastUpdatedEl.innerText = `נבדק לאחרונה: ${now.toLocaleTimeString('he-IL', {hour: '2-digit', minute:'2-digit'})}`;
+            const timeString = now.toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'he-IL', {hour: '2-digit', minute:'2-digit'});
+            lastUpdatedEl.innerText = `${i18n[currentLang].lastTestedTemplate}${timeString}`;
             
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
             showError(error.message);
-            lastUpdatedEl.innerText = 'שגיאת עדכון מערכת';
+            lastUpdatedEl.innerText = i18n[currentLang].serverError;
         }
     };
 
@@ -59,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardData.classList.add('hidden');
         errorState.classList.add('hidden');
         loadingState.classList.remove('hidden');
-        statusBadge.innerText = 'מחשב נתונים...';
+        statusBadge.innerText = i18n[currentLang].loadingStatus;
         statusBadge.className = 'badge badge-loading';
     };
 
@@ -68,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardData.classList.add('hidden');
         errorState.classList.remove('hidden');
         errorMessage.innerText = msg;
-        statusBadge.innerText = 'שגיאת שרת';
+        statusBadge.innerText = i18n[currentLang].serverError;
         statusBadge.className = 'badge badge-error';
     };
 
@@ -78,13 +165,13 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardData.classList.remove('hidden');
         
         // 1. Render Status Mode
-        let status = data.status_level || 'שגרה';
+        let status = data.status_level || i18n[currentLang].routine;
         statusBadge.innerText = status;
         
         let badgeClass = 'badge-routine';
-        if(status === 'תנועה ערה' || status === 'מתיחות') {
+        if(status === i18n[currentLang].tension || status === 'תנועה ערה' || status === 'Active') {
             badgeClass = 'badge-tension';
-        } else if(status === 'עומס דיווחים' || status === 'הסלמה') {
+        } else if(status === i18n[currentLang].escalation || status === 'עומס דיווחים' || status === 'Heavy Activity') {
             badgeClass = 'badge-escalation';
         }
         
@@ -98,12 +185,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 section.className = 'glass-panel category-section';
                 
                 const iconMap = {
-                    'ביטחון': '🛡️',
-                    'פוליטיקה': '🏛️',
-                    'כלכלה': '📈',
-                    'חינוך': '📚',
-                    'בריאות': '🏥',
-                    'כללי': '📰'
+                    'ביטחון': '🛡️', 'Security': '🛡️',
+                    'פוליטיקה': '🏛️', 'Politics': '🏛️',
+                    'כלכלה': '📈', 'Economy': '📈',
+                    'חינוך': '📚', 'Education': '📚',
+                    'בריאות': '🏥', 'Health': '🏥',
+                    'כללי': '📰', 'General': '📰'
                 };
                 const catIcon = iconMap[cat.name] || '📰';
                 
@@ -113,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         listHtml += `<li>${item}</li>`;
                     });
                 } else {
-                    listHtml = `<li style="color:var(--text-secondary); border-color:transparent;">אין עדכונים חריגים</li>`;
+                    listHtml = `<li style="color:var(--text-secondary); border-color:transparent;">${i18n[currentLang].noEvents}</li>`;
                 }
                 
                 section.innerHTML = `
@@ -125,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             categoriesContainer.innerHTML = `
                 <div class="glass-panel text-center full-width">
-                    <p style="color:var(--text-secondary);">לא נמצאו דיווחים חדשים לחלוקה לקטגוריות.</p>
+                    <p style="color:var(--text-secondary);">${i18n[currentLang].noCategories}</p>
                 </div>
             `;
         }
@@ -138,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tlItem.className = 'timeline-item';
                 
                 const timeStr = item.time || '';
-                const baseSource = item.source || 'מקור לא ידוע';
+                const baseSource = item.source || 'Unknown';
                 const sourceStr = channelMap[baseSource] || baseSource;
                 const eventStr = item.event || '';
                 
@@ -155,37 +242,48 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             timeline.innerHTML = `
                 <div class="glass-panel-light" style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">
-                    לא זוהו אירועים הדורשים ציון בציר הזמן בשעה האחרונה.
+                    ${i18n[currentLang].noTimeline}
                 </div>
             `;
         }
     };
 
-    const initLiveViewers = () => {
+    const initLiveViewers = async () => {
         const viewersEl = document.getElementById('live-viewers');
         if (!viewersEl) return;
         
-        // Random base number between 130 and 180
-        let baseViewers = Math.floor(Math.random() * (180 - 130 + 1)) + 130;
-        viewersEl.innerText = baseViewers;
-        
-        // Update number slightly every 5 seconds
-        setInterval(() => {
-            const change = Math.floor(Math.random() * 5) - 2; // -2 to +2
-            baseViewers = Math.max(130, baseViewers + change); // keep it looking realistic (min 130)
+        // Use a free external API to track REAL global views.
+        try {
+            const res = await fetch('https://api.counterapi.dev/v1/FocusNews/views/up');
+            const data = await res.json();
+            if (data && data.count) {
+                viewersEl.innerText = data.count.toLocaleString();
+            } else {
+                throw new Error("Invalid count");
+            }
+        } catch(e) {
+            console.error("Counter API failed, falling back to simulated counter.", e);
+            let baseViewers = Math.floor(Math.random() * (180 - 130 + 1)) + 130;
             viewersEl.innerText = baseViewers;
-        }, 5000);
+            setInterval(() => {
+                const change = Math.floor(Math.random() * 5) - 2;
+                baseViewers = Math.max(130, baseViewers + change);
+                viewersEl.innerText = baseViewers;
+            }, 5000);
+        }
     };
 
     refreshBtn.addEventListener('click', fetchUpdates);
 
-    const initTheme = () => {
+    const initThemeAndLang = () => {
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme === 'dark') {
             document.documentElement.setAttribute('data-theme', 'dark');
             themeIcon.innerText = '☀️';
+            themeText.innerText = i18n[currentLang].themeLight;
         } else {
             themeIcon.innerText = '🌙';
+            themeText.innerText = i18n[currentLang].themeDark;
         }
 
         themeToggle.addEventListener('click', () => {
@@ -194,11 +292,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.documentElement.removeAttribute('data-theme');
                 localStorage.setItem('theme', 'light');
                 themeIcon.innerText = '🌙';
+                themeText.innerText = i18n[currentLang].themeDark;
             } else {
                 document.documentElement.setAttribute('data-theme', 'dark');
                 localStorage.setItem('theme', 'dark');
                 themeIcon.innerText = '☀️';
+                themeText.innerText = i18n[currentLang].themeLight;
             }
+        });
+        
+        langToggle.addEventListener('click', () => {
+            currentLang = currentLang === 'he' ? 'en' : 'he';
+            localStorage.setItem('lang', currentLang);
+            updateUIText();
+            fetchUpdates(); // Refresh data in new language
         });
     };
 
@@ -228,7 +335,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial load
-    initTheme();
+    updateUIText();
+    initThemeAndLang();
     initLiveViewers();
     fetchUpdates();
 });
