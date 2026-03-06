@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FocusNews - עדכוני מלחמת שאגת הארי</title>
+    <title>Lion's Roar | OSINT Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <meta name="description" content="עדכונים חיים מסינון קבוצות טלגרם למלחמת שאגת הארי">
+    <meta name="description" content="Executive News & OSINT Dashboard - Lion's Roar Operation">
 </head>
 <body>
-
     <div class="bg-shape bg-shape-1"></div>
     <div class="bg-shape bg-shape-2"></div>
     <div class="bg-shape bg-shape-3"></div>
@@ -17,40 +16,76 @@
     <div class="app-container">
         <header class="glass-panel main-header">
             <div class="logo-area">
-                <div class="pulse-dot"></div>
-                <h1>FocusNews</h1>
+                <div class="pulse-dot" id="status-pulse"></div>
+                <h1>מבצע שאגת הארי</h1>
             </div>
-            <h2>מלחמת שאגת הארי</h2>
-            <p>עדכונים המסוננים בזמן אמת ממקורות מרכזיים. האתר מסתנכרן פעם בשעה על בסיס ענן.</p>
+            <h2>חפ"ק מודיעין ועדכונים - OSINT Dashboard</h2>
+            <p>מערכת מבוססת בינה מלאכותית לניתוח והצלבת נתונים מערוצי טלגרם, מתעדכנת בזמן אמת.</p>
+            
+            <div class="status-badge-container">
+                <span class="status-label">סטטוס כוננות:</span>
+                <span id="status-badge" class="badge badge-loading">טוען...</span>
+            </div>
+
             <div class="status-bar">
-                <span id="last-updated">טוען עדכונים...</span>
-                <button id="refresh-btn" class="refresh-btn">רענן כעת</button>
+                <span id="last-updated">מאתחל מערכות...</span>
+                <button id="refresh-btn" class="refresh-btn">סריקה מחדש</button>
             </div>
         </header>
 
-        <main id="news-container" class="news-grid">
-            <!-- News cards will be injected here via app.js -->
-            <div class="skeleton-card glass-panel">
-                <div class="skel-line title"></div>
-                <div class="skel-line"></div>
-                <div class="skel-line"></div>
-                <div class="skel-line short"></div>
+        <main id="dashboard-content" class="dashboard-grid">
+            <!-- Loading State -->
+            <div id="loading-state" class="glass-panel text-center full-width">
+                <div class="radar-spinner"></div>
+                <h3 class="mb-2">מנתח דיווחי מודיעין ורשתות...</h3>
+                <p>מפעיל מנוע AI לאיסוף והצלבת הנתונים מהשעה האחרונה.</p>
             </div>
-            <div class="skeleton-card glass-panel">
-                <div class="skel-line title"></div>
-                <div class="skel-line"></div>
-                <div class="skel-line"></div>
-                <div class="skel-line short"></div>
+
+            <!-- Error State -->
+            <div id="error-state" class="glass-panel text-center full-width hidden">
+                <h3 class="error-text">שגיאה בתקשורת נתונים</h3>
+                <p id="error-message"></p>
             </div>
-            <div class="skeleton-card glass-panel">
-                <div class="skel-line title"></div>
-                <div class="skel-line"></div>
-                <div class="skel-line short"></div>
+
+            <!-- Dashboard Sections (hidden until loaded) -->
+            <div id="dashboard-data" class="hidden full-width">
+                <div class="grid-layout">
+                    <!-- Summary Card -->
+                    <section class="glass-panel summary-section card-span-2">
+                        <h3><i class="icon">📋</i> תמונת מצב שעתית</h3>
+                        <p id="main-summary" class="summary-text"></p>
+                    </section>
+
+                    <!-- Critical Events Card -->
+                    <section class="glass-panel critical-section">
+                        <h3><i class="icon">🚨</i> אירועים קריטיים</h3>
+                        <ul id="critical-events" class="critical-list"></ul>
+                    </section>
+                </div>
+
+                <!-- Timeline Section -->
+                <section class="glass-panel timeline-section mt-4">
+                    <h3><i class="icon">⏱️</i> ציר זמן מאומת (השעה האחרונה)</h3>
+                    <div class="timeline-container" id="timeline"></div>
+                </section>
             </div>
         </main>
         
-        <footer class="glass-panel main-footer">
-            <p>פותח ומופעל על תשתיות Vercel | מעודכן כל שעה</p>
+        <footer class="glass-panel main-footer mt-4">
+            <div class="monitored-sources">
+                <h4>מקורות מנוטרים <span>(8/8 פעילים)</span></h4>
+                <div class="source-tags">
+                    <span>abualiexpress</span>
+                    <span>amitsegal</span>
+                    <span>miraedj</span>
+                    <span>ziv710</span>
+                    <span>salehdesk1</span>
+                    <span>arabworld301news</span>
+                    <span>GLOBAL_Telegram_MOKED</span>
+                    <span>New_security8200</span>
+                </div>
+            </div>
+            <p class="footer-copy">© מערכת OSINT "שאגת הארי" | מבוסס Vercel Serverless + Google Gemini AI</p>
         </footer>
     </div>
 

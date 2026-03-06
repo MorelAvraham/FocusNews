@@ -2,11 +2,13 @@ from http.server import BaseHTTPRequestHandler
 import json
 import requests
 from bs4 import BeautifulSoup
+import os
+import google.generativeai as genai
+from datetime import datetime, timezone, timedelta
 
 def fetch_telegram_messages(channel):
     url = f"https://t.me/s/{channel}"
     try:
-        # User-Agent to mimic a browser, Telegram block some requests without it
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
         }
@@ -17,18 +19,37 @@ def fetch_telegram_messages(channel):
         soup = BeautifulSoup(response.text, 'html.parser')
         messages = []
         
-        # Telegram public channels web preview has message blocks with class "tgme_widget_message"
+        # We only want messages from the last hour
+        now = datetime.now(timezone.utc)
+        one_hour_ago = now - timedelta(hours=1)
+        
         for block in soup.find_all('div', class_='tgme_widget_message'):
+            # Data Cleanup: remove views/meta stats to avoid noise
+            for meta in block.find_all('span', class_='tgme_widget_message_meta'):
+                meta.decompose()
+            for views in block.find_all('span', class_='tgme_widget_message_views'):
+                views.decompose()
+                
             text_el = block.find('div', class_='tgme_widget_message_text')
             if not text_el:
                 continue
                 
             text = text_el.get_text(separator=' \n ', strip=True)
-            
-            # Find time
+            if not text:
+                continue
+                
             time_wrap = block.find('a', class_='tgme_widget_message_date')
             time_el = time_wrap.find('time') if time_wrap else None
             time_str = time_el.get('datetime') if time_el else ""
+            
+            # Check if within last hour
+            if time_str:
+                try:
+                    msg_time = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                    if msg_time < one_hour_ago:
+                        continue
+                except Exception:
+                    pass
             
             messages.append({"channel": channel, "text": text, "time": time_str})
             
@@ -39,33 +60,89 @@ def fetch_telegram_messages(channel):
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        # We will scrape a few popular Israeli news Telegram channels
-        channels = ["abualiexpress", "amitsegal", "N12chat", "kann_news", "idfofficial"]
+        channels = [
+            "abualiexpress", "amitsegal", "miraedj", "ziv710",
+            "salehdesk1", "arabworld301news", "GLOBAL_Telegram_MOKED", "New_security8200"
+        ]
+        
         all_messages = []
         for c in channels:
             all_messages.extend(fetch_telegram_messages(c))
-        
-        # Filter messages specifically for "שאגת הארי" or related context (Lebanon war / operation)
-        # We also include some broad keywords so it doesn't return empty during normal times.
-        keywords = ["שאגת", "ארי", "חיזבאללה", "לבנון", "מלחמה", "צה\"ל", "תקיפה"]
-        filtered = []
-        
+            
+        if not all_messages:
+            fallback = {
+                "status_level": "שגרה",
+                "main_summary": "לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים.",
+                "critical_events": [],
+                "timeline": []
+            }
+            self.send_json(fallback)
+            return
+
+        # Prepare text for Gemini
+        combined_text_parts = []
         for m in all_messages:
-            if any(k in m["text"] for k in keywords):
-                filtered.append(m)
-                
-        # Sort by time, descending
-        filtered.sort(key=lambda x: x.get("time", ""), reverse=True)
+            time_str = m['time']
+            if time_str:
+                try:
+                    dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                    time_hm = dt.astimezone().strftime("%H:%M")
+                except:
+                    time_hm = ""
+            else:
+                time_hm = ""
+            combined_text_parts.append(f"[{time_hm}] Source: {m['channel']}\n{m['text']}")
+            
+        combined_text = "\n\n---\n\n".join(combined_text_parts)
         
-        # Return JSON
-        self.send_response(200)
+        # Token protection: Hard-truncate to 15,000 characters
+        if len(combined_text) > 15000:
+            combined_text = combined_text[:15000]
+
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            self.send_json({"error": "No GEMINI_API_KEY environment variable provided."}, 500)
+            return
+            
+        genai.configure(api_key=api_key)
+        
+        prompt = f"""You are an elite Israeli intelligence analyst assigned to the 'Lion's Roar' (שאגת הארי) operation.
+Your task is to review the raw Telegram intelligence intercepts from the last hour, cross-reference them, remove duplicates and noise, and provide a verified intelligence summary.
+Output MUST be ONLY a valid JSON object matching this exact schema:
+{{
+  "status_level": "שגרה" | "מתיחות" | "הסלמה" | "לחימה עצימה",
+  "main_summary": "A 2-3 sentence executive summary of the last hour in Hebrew.",
+  "critical_events": ["list of strings for high-priority events in Hebrew, if any"],
+  "timeline": [
+    {{"time": "HH:MM", "source": "channel_name", "event": "Short description"}}
+  ]
+}}
+
+Raw intercept data:
+{combined_text}
+"""
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                )
+            )
+            
+            result_json = response.text
+            # Use json.loads to ensure it's valid JSON format and parseable
+            data = json.loads(result_json)
+            self.send_json(data)
+            
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
+            
+    def send_json(self, data, status=200):
+        self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
-        # Access-Control-Allow-Origin to allow frontend to fetch
         self.send_header('Access-Control-Allow-Origin', '*')
-        # Cache for 1 hour at edge (s-maxage=3600), so Vercel only runs this once an hour!
-        # This perfectly implements "every hour" without needing a literal cron job.
+        # Vercel Caching to run exactly once per hour
         self.send_header('Cache-Control', 's-maxage=3600, stale-while-revalidate=600')
         self.end_headers()
-        
-        self.wfile.write(json.dumps(filtered[:50], ensure_ascii=False).encode('utf-8'))
-        return
+        self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
