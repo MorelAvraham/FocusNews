@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const refreshBtn = document.getElementById('refresh-btn');
     const lastUpdatedEl = document.getElementById('last-updated');
     
     const loadingState = document.getElementById('loading-state');
@@ -35,7 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
             shareBtn: "שתף תקציר ל-WhatsApp",
             timelineTitle: "⏱️ ציר זמן מאומת (השעה האחרונה)",
             sourcesTitle: "מקורות מנוטרים <span>(8/8 פעילים)</span>",
-            lastTestedTemplate: "נבדק לאחרונה: ",
+            lastTestedTemplate: "עדכון אחרון: ",
+            autoUpdateNote: "הנתונים מתעדכנים אוטומטית בכל שעה",
             noEvents: "אין עדכונים חריגים",
             noCategories: "לא נמצאו דיווחים חדשים לחלוקה לקטגוריות.",
             noTimeline: "לא זוהו אירועים הדורשים ציון בציר הזמן בשעה האחרונה.",
@@ -61,7 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
             shareBtn: "Share Summary to WhatsApp",
             timelineTitle: "⏱️ Verified Timeline (Last Hour)",
             sourcesTitle: "Monitored Sources <span>(8/8 Active)</span>",
-            lastTestedTemplate: "Last checked: ",
+            lastTestedTemplate: "Last updated: ",
+            autoUpdateNote: "Data updates automatically every hour",
             noEvents: "No unusual updates",
             noCategories: "No new reports found to categorize.",
             noTimeline: "No actionable events detected in the timeline for the last hour.",
@@ -98,7 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('h2').innerText = dict.subtitle;
         document.querySelector('header p').innerText = dict.desc;
         document.querySelector('.status-label').innerText = dict.statusLabel;
-        document.getElementById('refresh-btn').innerText = dict.refreshBtn;
         document.querySelector('#loading-state h3').innerText = dict.loadingTitle;
         document.querySelector('#loading-state p').innerText = dict.loadingDesc;
         document.querySelector('#error-state h3').innerText = dict.errorTitle;
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const now = new Date();
             const timeString = now.toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'he-IL', {hour: '2-digit', minute:'2-digit'});
-            lastUpdatedEl.innerText = `${i18n[currentLang].lastTestedTemplate}${timeString}`;
+            lastUpdatedEl.innerText = `${i18n[currentLang].lastTestedTemplate}${timeString} | ${i18n[currentLang].autoUpdateNote}`;
             
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -272,8 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 5000);
         }
     };
-
-    refreshBtn.addEventListener('click', fetchUpdates);
 
     const initThemeAndLang = () => {
         const savedTheme = localStorage.getItem('theme');
