@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusNews - עדכוני מלחמת שאגת הארי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="עדכונים חיים מסינון קבוצות טלגרם למלחמת שאגת הארי">
+</head>
+<body>
+
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+    <div class="bg-shape bg-shape-3"></div>
+
+    <div class="app-container">
+        <header class="glass-panel main-header">
+            <div class="logo-area">
+                <div class="pulse-dot"></div>
+                <h1>FocusNews</h1>
+            </div>
+            <h2>מלחמת שאגת הארי</h2>
+            <p>עדכונים המסוננים בזמן אמת ממקורות מרכזיים. האתר מסתנכרן פעם בשעה על בסיס ענן.</p>
+            <div class="status-bar">
+                <span id="last-updated">טוען עדכונים...</span>
+                <button id="refresh-btn" class="refresh-btn">רענן כעת</button>
+            </div>
+        </header>
+
+        <main id="news-container" class="news-grid">
+            <!-- News cards will be injected here via app.js -->
+            <div class="skeleton-card glass-panel">
+                <div class="skel-line title"></div>
+                <div class="skel-line"></div>
+                <div class="skel-line"></div>
+                <div class="skel-line short"></div>
+            </div>
+            <div class="skeleton-card glass-panel">
+                <div class="skel-line title"></div>
+                <div class="skel-line"></div>
+                <div class="skel-line"></div>
+                <div class="skel-line short"></div>
+            </div>
+            <div class="skeleton-card glass-panel">
+                <div class="skel-line title"></div>
+                <div class="skel-line"></div>
+                <div class="skel-line short"></div>
+            </div>
+        </main>
+        
+        <footer class="glass-panel main-footer">
+            <p>פותח ומופעל על תשתיות Vercel | מעודכן כל שעה</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
