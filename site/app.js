@@ -147,8 +147,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const initLiveViewers = () => {
+        const viewersEl = document.getElementById('live-viewers');
+        if (!viewersEl) return;
+        
+        // Random base number between 130 and 180
+        let baseViewers = Math.floor(Math.random() * (180 - 130 + 1)) + 130;
+        viewersEl.innerText = baseViewers;
+        
+        // Update number slightly every 5 seconds
+        setInterval(() => {
+            const change = Math.floor(Math.random() * 5) - 2; // -2 to +2
+            baseViewers = Math.max(130, baseViewers + change); // keep it looking realistic (min 130)
+            viewersEl.innerText = baseViewers;
+        }, 5000);
+    };
+
     refreshBtn.addEventListener('click', fetchUpdates);
 
     // Initial load
+    initLiveViewers();
     fetchUpdates();
 });
