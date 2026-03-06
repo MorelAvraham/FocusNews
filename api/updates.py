@@ -76,7 +76,6 @@ class handler(BaseHTTPRequestHandler):
         if not all_messages:
             if lang == 'en':
                 fallback = {
-                    "status_level": "Routine",
                     "categories": [
                         {"name": "General", "items": ["No new reports gathered in the last hour from monitored sources."]}
                     ],
@@ -84,7 +83,6 @@ class handler(BaseHTTPRequestHandler):
                 }
             else:
                 fallback = {
-                    "status_level": "שגרה",
                     "categories": [
                         {"name": "כללי", "items": ["לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים."]}
                     ],
@@ -95,12 +93,13 @@ class handler(BaseHTTPRequestHandler):
 
         # Prepare text for Gemini
         combined_text_parts = []
+        israel_tz = timezone(timedelta(hours=2))
         for m in all_messages:
             time_str = m['time']
             if time_str:
                 try:
                     dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
-                    time_hm = dt.astimezone().strftime("%H:%M")
+                    time_hm = dt.astimezone(israel_tz).strftime("%H:%M")
                 except:
                     time_hm = ""
             else:
@@ -122,9 +121,9 @@ class handler(BaseHTTPRequestHandler):
         
         prompt_hebrew = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
 Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, and provide a clean, categorized news summary in HEBREW.
+For the timeline, you MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
 Output MUST be ONLY a valid JSON object matching this exact schema:
 {{
-  "status_level": "שגרה" | "תנועה ערה" | "עומס דיווחים",
   "categories": [
     {{
       "name": "ביטחון" | "פוליטיקה" | "כלכלה" | "כללי",
@@ -142,9 +141,9 @@ Raw intercept data:
 
         prompt_english = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
 Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, translate it all to ENGLISH, and provide a clean, categorized news summary in ENGLISH.
+For the timeline, you MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
 Output MUST be ONLY a valid JSON object matching this exact schema:
 {{
-  "status_level": "Routine" | "Active" | "Heavy Activity",
   "categories": [
     {{
       "name": "Security" | "Politics" | "Economy" | "General",

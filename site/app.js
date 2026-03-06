@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessage = document.getElementById('error-message');
     const dashboardData = document.getElementById('dashboard-data');
     
-    const statusBadge = document.getElementById('status-badge');
     const categoriesContainer = document.getElementById('categories-container');
     const timeline = document.getElementById('timeline');
     
@@ -98,7 +97,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.querySelector('h2').innerText = dict.subtitle;
         document.querySelector('header p').innerText = dict.desc;
-        document.querySelector('.status-label').innerText = dict.statusLabel;
         document.querySelector('#loading-state h3').innerText = dict.loadingTitle;
         document.querySelector('#loading-state p').innerText = dict.loadingDesc;
         document.querySelector('#error-state h3').innerText = dict.errorTitle;
@@ -146,8 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardData.classList.add('hidden');
         errorState.classList.add('hidden');
         loadingState.classList.remove('hidden');
-        statusBadge.innerText = i18n[currentLang].loadingStatus;
-        statusBadge.className = 'badge badge-loading';
     };
 
     const showError = (msg) => {
@@ -155,8 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboardData.classList.add('hidden');
         errorState.classList.remove('hidden');
         errorMessage.innerText = msg;
-        statusBadge.innerText = i18n[currentLang].serverError;
-        statusBadge.className = 'badge badge-error';
     };
 
     const renderDashboard = (data) => {
@@ -164,20 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         errorState.classList.add('hidden');
         dashboardData.classList.remove('hidden');
         
-        // 1. Render Status Mode
-        let status = data.status_level || i18n[currentLang].routine;
-        statusBadge.innerText = status;
-        
-        let badgeClass = 'badge-routine';
-        if(status === i18n[currentLang].tension || status === 'תנועה ערה' || status === 'Active') {
-            badgeClass = 'badge-tension';
-        } else if(status === i18n[currentLang].escalation || status === 'עומס דיווחים' || status === 'Heavy Activity') {
-            badgeClass = 'badge-escalation';
-        }
-        
-        statusBadge.className = `badge ${badgeClass}`;
-        
-        // 2. Categories
+        // 1. Categories
         categoriesContainer.innerHTML = '';
         if(data.categories && data.categories.length > 0) {
             data.categories.forEach(cat => {

@@ -200,36 +200,7 @@ h2 {
     font-size: 0.95rem;
 }
 
-/* Status Badge */
-.status-badge-container {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(0,0,0,0.3);
-    padding: 8px 20px;
-    border-radius: 30px;
-    border: 1px solid var(--card-border-glass);
-    margin-bottom: 20px;
-}
-.status-label {
-    font-weight: bold;
-    color: var(--text-secondary);
-}
-.badge {
-    padding: 4px 12px;
-    border-radius: 8px;
-    font-weight: bold;
-    font-size: 0.9rem;
-    letter-spacing: 0.5px;
-}
-
-/* Badge States */
-.badge-routine { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
-.badge-tension { background: rgba(245, 158, 11, 0.15); color: var(--accent-orange); border: 1px solid rgba(245, 158, 11, 0.3); }
-.badge-escalation { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); }
-
-.badge-loading { background: rgba(128,128,128,0.1); color: var(--text-secondary); }
-.badge-error { background: rgba(239,68,68,0.1); color: var(--accent-red); }
+/* Removed Status Badge Styles */
 
 /* Status Bar & Refresh */
 .status-bar {
@@ -265,7 +236,7 @@ h2 {
 }
 .grid-layout {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.5rem;
 }
 
@@ -480,11 +451,14 @@ section h3 {
 }
 
 /* Responsiveness */
+@media (max-width: 1100px) {
+    .grid-layout { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 900px) {
-    .grid-layout { grid-template-columns: 1fr; }
     h1 { font-size: 2.2rem; }
 }
 @media (max-width: 600px) {
+    .grid-layout { grid-template-columns: 1fr; }
     .timeline-item { gap: 10px; }
     .timeline-item::before { right: 44px; }
     .footer-bottom {
