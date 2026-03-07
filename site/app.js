@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const channelMap = {
         'abualiexpress': 'אבו עלי אקספרס',
         'amitsegal': 'עמית סגל',
-        'miraedj': 'מירה אדג\'י',
+        'miraedj': 'מבזק אפל',
         'ziv710': 'זיו רובינשטיין',
         'salehdesk1': 'סאלח (הדסק הערבי)',
         'arabworld301news': 'עולם הערבים 301',
