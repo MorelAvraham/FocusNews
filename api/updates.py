@@ -6,6 +6,7 @@ import os
 import google.generativeai as genai
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
+import concurrent.futures
 
 def fetch_telegram_messages(channel):
     url = f"https://t.me/s/{channel}"
@@ -70,8 +71,17 @@ class handler(BaseHTTPRequestHandler):
         ]
         
         all_messages = []
-        for c in channels:
-            all_messages.extend(fetch_telegram_messages(c))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            future_to_channel = {executor.submit(fetch_telegram_messages, c): c for c in channels}
+            for future in concurrent.futures.as_completed(future_to_channel):
+                try:
+                    msgs = future.result()
+                    all_messages.extend(msgs)
+                except Exception as e:
+                    print(f"Failed fetching channel: {e}")
+                    
+        # Sort messages by time ascending (helps AI understand chronological timeline)
+        all_messages.sort(key=lambda x: x.get('time', ''))
             
         if not all_messages:
             if lang == 'en':
@@ -128,7 +138,12 @@ Output MUST be ONLY a valid JSON object matching this exact schema:
   "categories": [
     {{
       "name": "ביטחון" | "פוליטיקה" | "כלכלה" | "כללי",
-      "items": ["list of short strings summarizing key distinct news items in this category"]
+      "items": [
+        {{
+          "text": "short string summarizing key distinct news item in this category",
+          "source": "channel_name"
+        }}
+      ]
     }}
   ],
   "timeline": [
@@ -149,7 +164,12 @@ Output MUST be ONLY a valid JSON object matching this exact schema:
   "categories": [
     {{
       "name": "Security" | "Politics" | "Economy" | "General",
-      "items": ["list of short strings summarizing key distinct news items in this category"]
+      "items": [
+        {{
+          "text": "short string summarizing key distinct news item in this category",
+          "source": "channel_name"
+        }}
+      ]
     }}
   ],
   "timeline": [
@@ -174,6 +194,11 @@ Raw intercept data:
             result_json = response.text
             # Use json.loads to ensure it's valid JSON format and parseable
             data = json.loads(result_json)
+            
+            # Inject the exact server generation time
+            gen_tz = timezone(timedelta(hours=2))
+            data["generated_at"] = datetime.now(gen_tz).strftime("%H:%M")
+            
             self.send_json(data)
             
         except Exception as e:

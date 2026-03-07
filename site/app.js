@@ -135,8 +135,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             renderDashboard(data);
 
-            const now = new Date();
-            const timeString = now.toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'he-IL', { hour: '2-digit', minute: '2-digit' });
+            let timeString = '';
+            if (data.generated_at) {
+                timeString = data.generated_at;
+            } else {
+                const now = new Date();
+                timeString = now.toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'he-IL', { hour: '2-digit', minute: '2-digit' });
+            }
+            
             lastUpdatedEl.innerText = `${i18n[currentLang].lastTestedTemplate}${timeString} | ${i18n[currentLang].autoUpdateNote}`;
 
         } catch (error) {
@@ -194,7 +200,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 let listHtml = '';
                 if (cat.items && cat.items.length > 0) {
                     cat.items.forEach(item => {
-                        listHtml += `<li>${item}</li>`;
+                        let textStr = "";
+                        let sourceStr = "";
+                        
+                        // Defensively support both old schema (string) and new schema (object)
+                        if (typeof item === 'string') {
+                            textStr = item;
+                        } else {
+                            textStr = item.text || '';
+                            let baseSource = item.source || '';
+                            sourceStr = channelMap[baseSource] || baseSource;
+                        }
+                        
+                        let sourceHtml = '';
+                        if (sourceStr) {
+                            sourceHtml = `<div class="item-source-tag">${sourceStr}</div>`;
+                        }
+                        
+                        listHtml += `<li>
+                            <div class="item-content">${textStr}</div>
+                            ${sourceHtml}
+                        </li>`;
                     });
                 } else {
                     listHtml = `<li style="color:var(--text-secondary); border-color:transparent;">${i18n[currentLang].noEvents}</li>`;
@@ -217,7 +243,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. Verified Timeline
         timeline.innerHTML = '';
         if (data.timeline && data.timeline.length > 0) {
-            data.timeline.forEach(item => {
+            // Sort timeline chronologically to ensure it's displayed sequentially
+            const sortedTimeline = [...data.timeline].sort((a, b) => {
+                const ta = a.time || "";
+                const tb = b.time || "";
+                return ta.localeCompare(tb);
+            });
+            
+            sortedTimeline.forEach(item => {
                 const tlItem = document.createElement('div');
                 tlItem.className = 'timeline-item';
 
@@ -326,7 +359,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const title = cat.querySelector('h3').innerText;
             const items = cat.querySelectorAll('li');
             if (items.length > 0 && items[0].innerText !== "אין עדכונים חריגים" && itemCount < 3) {
-                text += `*${title.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').trim()}*\n- ${items[0].innerText}\n\n`;
+                const itemContent = items[0].querySelector('.item-content') ? items[0].querySelector('.item-content').innerText : items[0].innerText;
+                text += `*${title.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').trim()}*\n- ${itemContent}\n\n`;
                 itemCount++;
             }
         });

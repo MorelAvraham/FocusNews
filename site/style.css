@@ -275,6 +275,20 @@ section h3 {
     font-size: 1rem;
     line-height: 1.6;
     color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.item-source-tag {
+    font-size: 0.75rem;
+    color: var(--accent-orange);
+    background: rgba(245, 158, 11, 0.1);
+    padding: 2px 8px;
+    border-radius: 12px;
+    align-self: flex-start;
+    font-weight: bold;
+    border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 /* Timeline */
@@ -421,14 +435,23 @@ section h3 {
     border: 1px solid var(--card-border-glass);
 }
 
+.footer-bottom {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
 .footer-copy {
     font-size: 0.85rem;
     color: var(--text-secondary);
+    margin: 0;
 }
 
 .social-links {
     display: flex;
     gap: 15px;
+    order: -1;
 }
 
 .linkedin-link {
@@ -463,13 +486,38 @@ section h3 {
 @media (max-width: 900px) {
     h1 { font-size: 2.2rem; }
 }
+@media (max-width: 768px) {
+    .app-container { padding: 1rem; gap: 1.2rem; }
+    .glass-panel { padding: 1.5rem; }
+    .header-top-bar { flex-direction: column; gap: 15px; }
+    .top-bar-controls { justify-content: center; width: 100%; }
+    .top-viewers-container { justify-content: center; width: 100%; flex-wrap: wrap; }
+    h1 { font-size: 2rem; }
+    .whatsapp-btn { width: 100%; justify-content: center; }
+}
 @media (max-width: 600px) {
     .grid-layout { grid-template-columns: 1fr; }
     .timeline-item { gap: 10px; }
     .timeline-item::before { right: 44px; }
+    
     .footer-bottom {
         flex-direction: column;
         justify-content: center;
+        align-items: center;
+        gap: 15px;
         text-align: center;
     }
+    
+    .btn-text { display: none; }
+    .top-viewers { font-size: 0.9rem; padding: 6px 12px; }
+    
+    .app-container { padding: 0.6rem; gap: 1rem; }
+    .glass-panel { padding: 1.2rem; border-radius: 12px; }
+    .glass-panel-light { padding: 1rem; }
+    
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.05rem; }
+    .main-header p { font-size: 0.85rem; padding: 0 5px; }
+    
+    section h3 { font-size: 1.1rem; }
 }
