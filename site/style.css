@@ -141,6 +141,30 @@ body {
     transform: translateY(-2px);
 }
 
+.history-select {
+    appearance: none;
+    background-color: var(--card-bg-light);
+    color: var(--text-primary);
+    padding-right: 32px;
+    padding-left: 12px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+[dir="ltr"] .history-select {
+    padding-left: 32px;
+    padding-right: 12px;
+}
+[dir="ltr"] .top-bar-controls > div > span {
+    left: 10px; right: auto !important;
+}
+
+.history-select:hover {
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+    border-color: rgba(0, 212, 255, 0.4);
+}
+
 .btn-text {
     font-weight: 500;
 }

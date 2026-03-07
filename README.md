@@ -1,21 +1,51 @@
-# FocusNews - מלחמת שאגת הארי 🦁🇮🇱
+# FocusNews 🌎 📰
 
-מערכת סינון והצגת חדשות המבוססת על ענן Vercel עם Serverless Functions כדי לאסוף, לסנן ולהציג עדכונים מערוצי טלגרם וגורמים שונים אחת לשעה.
+**FocusNews** is an advanced, AI-powered news aggregator built to combat information overload. Designed as an "Executive News & OSINT Dashboard," it systematically pulls raw intelligence reports directly from real-time sources, uses advanced natural language processing to extract the signal from the noise, and presents a comprehensive overview. The focus is to deliver calm, factual, and strictly validated summaries rather than chaotic streams of updates.
 
-## ארכיטקטורה ופיתוח
-הפרויקט עובד באמצעות ארכיטקטורת Serverless וכולל שני חלקים עיקריים:
-1. **Frontend (`site/`):** אתר עם עיצוב מתקדם (Glassmorphism + אנימציות רקע) המבוסס על HTML, CSS ו-JS.
-2. **Backend / API (`api/`):** פונקציית פייתון (Serverless Function) שניגשת לערוצי טלגרם ציבוריים, שואבת את ההודעות, ומסננת לפי אלגוריתם קצר (מילות מפתח כמו "שאגת הארי", "לבנון", "צה"ל").
+![FocusNews Showcase](https://img.shields.io/badge/Status-Active-success) ![Vercel Deployment](https://img.shields.io/badge/Vercel-Serverless-black?logo=vercel) ![Gemini 2.5](https://img.shields.io/badge/Gemini_2.5_Flash-AI-blueviolet)
 
-## היתרון בשימוש Vercel
-כיוון שהלקוח צד השרת משתמש ב-Edge Caching (`s-maxage=3600`), Vercel דואגת להריץ את סקריפט הפייתון **רק פעם אחת בשעה** באופן מדויק! זה חוסך משאבים, מביא ביצועים אולטרה-מהירים למשתמשי האתר ולא חורג בחיובים.
+---
 
-## איך מפעילים?
-דחיפה ל-GitHub וחיבור הפרויקט ל-Vercel. זה הכל!
+## 🛠️ Tech Stack & Engineering Decisions
 
-```bash
-git add .
-git commit -m "Initialize FocusNews on Vercel"
-git push origin main
-```
-הגדרות הפרויקט ב-Vercel יזהו באופן אוטומטי את קובץ ה-`vercel.json` ואת תיקיית העבודה.
+FocusNews was strategically built without heavy frameworks to maintain extreme flexibility, maximize performance, and demonstrate deep fundamental engineering capabilities.
+
+### Frontend
+- **Vanilla HTML5 & CSS3**: Utilized pure HTML and CSS to create a lightweight, blazing-fast client experience.
+- **Glassmorphism UI**: Uses advanced CSS backdrop-filters, custom dynamic background layers, and responsive CSS Grid architecture to render an immersive, high-end "Glassmorphic" interface. Modern styling and fluid micro-animations build a premium aesthetic. Dark and Light themes are supported natively.
+- **Vanilla JavaScript**: Manages asynchronous data fetching, DOM hydration, dynamic localization (Hebrew & English), DOM-based WhatsApp sharing generation, and historical timeline dropdown states.
+
+### Backend Infrastructure
+- **Serverless Python (Vercel)**: Implements custom `BaseHTTPRequestHandler` structures utilizing Vercel's serverless ecosystem. Highly concurrent scraping loops process gigabytes of unstructured data streams parallelly using `concurrent.futures.ThreadPoolExecutor`.
+- **Google Gemini 2.5 Flash**: Acts as the cognitive engine. Raw chronological intercepts from monitored OSINT groups are piped directly into the Gemini model. Gemini uses strict JSON-schema enforcement to parse out redundancy, translate content, generate extensive executive summaries, and construct categorized arrays and verified timelines.
+- **Upstash Redis**: Used as the primary data store for fast-read operations:
+  1. **Historical Archiving (ZSET)**: Maintains a rolling 24-hour history index, dropping records outside the 24-hour TTL using `zremrangebyscore` while returning precise hour-ago snapshots on demand.
+  2. **Live Viewers Telemetry**: Powers real-time dashboard analytics tracking active users synchronously without spinning up a heavy monolithic database.
+
+---
+
+## 🏗️ Architecture & Data Flow
+
+At the core of the FocusNews architecture is **Operational Efficiency** and **Cost-Optimization**.
+
+1. **Trigger & Fetch**: When a user accesses the dashboard, the Edge Network routes the request to the Python Serverless instance.
+2. **Parallel Collection**: The backend fires up up to 8 parallel background threads to scrape the latest raw updates directly from monitored Telegram sources within the last 60 minutes.
+3. **Cognitive Parsing**: The combined dataset (truncated defensively for optimal context-window management) is piped to Gemini 2.5 Flash with highly structured multi-language prompt instructions.
+4. **Edge Caching & Cost-Saving**: 
+   - A critical aspect of the system relies on Vercel's Edge Caching headers (`Cache-Control: s-maxage=3600, stale-while-revalidate=600`).
+   - This architectural decision ensures the heavy LLM summarization compute runs **exactly once per hour**. All subsequent traffic within the hour is served ultra-fast (measured in milliseconds) directly from global edge nodes, eliminating redundant API costs to Google while securing immediate load times for end-users.
+5. **Historical Ledger**: Every successful hour generation pushes the final compiled JSON into an Upstash Redis Ordered Set indexed by a Unix timestamp. The dedicated `/api/history` serverless endpoint serves backward-looking requests, preventing the need to re-process historical OSINT chunks.
+
+---
+
+## ✨ Core Features
+
+* **Bilingual Dynamic Support**: One-click switching between Hebrew and English, rendering complete translations structurally generated by the LLM without hardcoded dictionaries.
+* **24-Hour Time Machine**: Dropdown UI integrated directly with the Redis historical state to travel back and view previously generated snapshots from up to 24 hours ago.
+* **Smart WhatsApp Sharing**: Seamlessly constructs beautifully formatted WhatsApp text containing the AI overview, timeline snapshots, and top category events – directly from the active DOM.
+* **Real-time Live Analytics**: Custom session-id-based ping mechanism communicating with the Redis store to reflect currently active users watching the feed.
+* **Categorized De-duplication**: The engine logically fuses 50 different redundant posts about the same incident into a single clean line within specific modules (Security, Politics, Economy, etc.).
+
+---
+
+*This application demonstrates full-stack expertise combining modern UI/UX principles, direct serverless integration, LLM-driven backend processing, stateful caching optimization, and high-performance serverless architecture.*

@@ -20,6 +20,10 @@
       "dest": "/api/viewer.py"
     },
     {
+      "src": "/api/history",
+      "dest": "/api/history.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "/site/$1"
     },

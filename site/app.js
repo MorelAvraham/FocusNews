@@ -21,9 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dictionary for Translations
     const i18n = {
         he: {
-            title: "FocusNews",
-            subtitle: "כל החדשות, בלי הרעש",
-            desc: "מערכת חכמה לניתוח וסינון דיווחים, מתעדכנת בזמן אמת.",
+            title: "FocusNews - חדשות ממוקדות מבצע : שאגת הארי ",
+            subtitle: "להישאר מעודכנים, בלי להישאב לטלגרם. פעם בשעה!",
+            desc: "איסוף, הצלבה וסינון של דיווחים מהשטח באמצעות בינה מלאכותית. העדכונים הקריטיים בלבד, מוגשים בכל שעה עגולה.",
             statusLabel: "עומס דיווחים:",
             loadingStatus: "מחשב נתונים...",
             refreshBtn: "סריקה מחדש",
@@ -47,12 +47,15 @@ document.addEventListener('DOMContentLoaded', () => {
             langName: "English",
             liveLabel: "אונליין",
             viewsLabel: "כניסות",
-            summaryTitle: "סיכום AI (מבט על)"
+            summaryTitle: "סיכום AI (מבט על)",
+            historyNow: "עכשיו",
+            historyHourAgo: "לפני שעה",
+            historyHoursAgo: "לפני {h} שעות"
         },
         en: {
-            title: "FocusNews",
-            subtitle: "All the News, Without the Noise",
-            desc: "Smart system for analyzing and filtering reports, updated in real-time.",
+            title: "FocusNews - Operation Lion's Roar",
+            subtitle: "Stay updated without getting sucked into Telegram. Once an hour!",
+            desc: "AI-powered collection, cross-referencing, and filtering of field reports. Only the critical updates, delivered every hour on the hour.",
             statusLabel: "News Volume:",
             loadingStatus: "Processing...",
             refreshBtn: "Rescan",
@@ -76,7 +79,10 @@ document.addEventListener('DOMContentLoaded', () => {
             langName: "עברית",
             liveLabel: "Online",
             viewsLabel: "Views",
-            summaryTitle: "AI Summary (Overview)"
+            summaryTitle: "AI Summary (Overview)",
+            historyNow: "Current",
+            historyHourAgo: "1 Hour Ago",
+            historyHoursAgo: "{h} Hours Ago"
         }
     };
 
@@ -113,15 +119,48 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('viewers-label').innerText = dict.viewsLabel;
         document.getElementById('summary-title').innerText = dict.summaryTitle;
 
+        updateHistoryDropdown();
+
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         themeText.innerText = isDark ? dict.themeLight : dict.themeDark;
+    };
+
+    const updateHistoryDropdown = () => {
+        const dict = i18n[currentLang];
+        const historySelector = document.getElementById('history-selector');
+        if (!historySelector) return;
+
+        const prevVal = historySelector.value || "0";
+        historySelector.innerHTML = '';
+
+        for (let i = 0; i <= 24; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            if (i === 0) {
+                option.text = dict.historyNow;
+            } else if (i === 1) {
+                option.text = dict.historyHourAgo;
+            } else {
+                option.text = dict.historyHoursAgo.replace('{h}', i);
+            }
+            historySelector.appendChild(option);
+        }
+        historySelector.value = prevVal;
     };
 
     const fetchUpdates = async () => {
         try {
             showLoading();
 
-            const res = await fetch(`/api/updates?lang=${currentLang}`);
+            const historySelector = document.getElementById('history-selector');
+            const hoursAgo = historySelector ? historySelector.value : "0";
+
+            let endpoint = `/api/updates?lang=${currentLang}`;
+            if (hoursAgo !== "0") {
+                endpoint = `/api/history?lang=${currentLang}&hours_ago=${hoursAgo}`;
+            }
+
+            const res = await fetch(endpoint);
 
             if (!res.ok) {
                 let errText = await res.text();
@@ -142,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const now = new Date();
                 timeString = now.toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'he-IL', { hour: '2-digit', minute: '2-digit' });
             }
-            
+
             lastUpdatedEl.innerText = `${i18n[currentLang].lastTestedTemplate}${timeString} | ${i18n[currentLang].autoUpdateNote}`;
 
         } catch (error) {
@@ -202,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     cat.items.forEach(item => {
                         let textStr = "";
                         let sourceStr = "";
-                        
+
                         // Defensively support both old schema (string) and new schema (object)
                         if (typeof item === 'string') {
                             textStr = item;
@@ -211,12 +250,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             let baseSource = item.source || '';
                             sourceStr = channelMap[baseSource] || baseSource;
                         }
-                        
+
                         let sourceHtml = '';
                         if (sourceStr) {
                             sourceHtml = `<div class="item-source-tag">${sourceStr}</div>`;
                         }
-                        
+
                         listHtml += `<li>
                             <div class="item-content">${textStr}</div>
                             ${sourceHtml}
@@ -249,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tb = b.time || "";
                 return ta.localeCompare(tb);
             });
-            
+
             sortedTimeline.forEach(item => {
                 const tlItem = document.createElement('div');
                 tlItem.className = 'timeline-item';
@@ -349,29 +388,68 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const shareToWhatsapp = () => {
-        const url = window.location.href;
-        let text = "עדכוני FocusNews בשעה האחרונה:\n\n";
+        const url = window.location.href.split('?')[0];
+        let text = currentLang === 'en' ? "📰 *FocusNews - Live Updates:*\n\n" : "📰 *מבזק FocusNews - סיכום השעה:*\n\n";
 
-        const categories = document.querySelectorAll('.category-section');
-        let itemCount = 0;
+        // Add summary if exists
+        const summaryText = document.getElementById('ai-summary-text');
+        if (summaryText && summaryText.innerText.trim() !== "") {
+            const summaryTitle = currentLang === 'en' ? "Overview" : "מבט על";
+            text += `*🌎 ${summaryTitle}:*\n${summaryText.innerText.trim()}\n\n`;
+        }
 
-        categories.forEach(cat => {
-            const title = cat.querySelector('h3').innerText;
-            const items = cat.querySelectorAll('li');
-            if (items.length > 0 && items[0].innerText !== "אין עדכונים חריגים" && itemCount < 3) {
-                const itemContent = items[0].querySelector('.item-content') ? items[0].querySelector('.item-content').innerText : items[0].innerText;
-                text += `*${title.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').trim()}*\n- ${itemContent}\n\n`;
-                itemCount++;
+        const timelineDivs = document.querySelectorAll('.timeline-item');
+        let hasTimeline = false;
+
+        if (timelineDivs.length > 0) {
+            const firstItemText = timelineDivs[0].innerText.trim();
+            if (!firstItemText.includes("No actionable events") && !firstItemText.includes("לא זוהו אירועים")) {
+                text += currentLang === 'en' ? "*🔥 Key Events:*\n" : "*🔥 אירועים בולטים:*\n";
+                let eventCount = 0;
+                timelineDivs.forEach(tli => {
+                    if (eventCount < 4 && tli.querySelector('.timeline-time') && tli.querySelector('p')) {
+                        const time = tli.querySelector('.timeline-time').innerText;
+                        const eventContent = tli.querySelector('p').innerText;
+                        if (eventContent) {
+                            text += `🕒 ${time} - ${eventContent}\n`;
+                            eventCount++;
+                        }
+                    }
+                });
+                text += "\n";
+                hasTimeline = true;
             }
-        });
+        }
 
-        text += `לכל הדיווחים אונליין: ${url}`;
+        if (!hasTimeline) {
+            const categories = document.querySelectorAll('.category-section');
+            let itemCount = 0;
+            categories.forEach(cat => {
+                const h3 = cat.querySelector('h3');
+                if (!h3) return;
+                const title = h3.innerText;
+                const items = cat.querySelectorAll('li');
+                if (items.length > 0 && !items[0].innerText.includes(i18n[currentLang].noEvents) && itemCount < 3) {
+                    const itemContent = items[0].querySelector('.item-content') ? items[0].querySelector('.item-content').innerText : items[0].innerText;
+                    text += `*${title.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').trim()}*\n- ${itemContent}\n\n`;
+                    itemCount++;
+                }
+            });
+        }
+
+        text += currentLang === 'en' ? `🔗 Read full updates live: ${url}` : `🔗 קראו את העדכונים המלאים: ${url}`;
+
         const encodedText = encodeURIComponent(text);
         window.open(`https://wa.me/?text=${encodedText}`, '_blank');
     };
 
     if (shareWhatsappBtn) {
         shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
+    }
+
+    const historySelector = document.getElementById('history-selector');
+    if (historySelector) {
+        historySelector.addEventListener('change', fetchUpdates);
     }
 
     // Initial load

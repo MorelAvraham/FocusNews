@@ -3,6 +3,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import os
+import redis
 import google.generativeai as genai
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
@@ -134,7 +135,7 @@ Your task is to review the raw string intercepts from news sources in the last h
 For the timeline, select the 3-5 most interesting, critical, or breaking news events from the last hour. You MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
 Output MUST be ONLY a valid JSON object matching this exact schema:
 {{
-  "summary": "2-3 sentences summarizing the overall news situation from the past hour in Hebrew.",
+  "summary": "A comprehensive and detailed 4-7 sentences paragraph summarizing the overall news situation from the past hour in Hebrew, providing broader context and covering the main developments thoroughly.",
   "categories": [
     {{
       "name": "ביטחון" | "פוליטיקה" | "כלכלה" | "כללי",
@@ -160,7 +161,7 @@ Your task is to review the raw string intercepts from news sources in the last h
 For the timeline, select the 3-5 most interesting, critical, or breaking news events from the last hour. You MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
 Output MUST be ONLY a valid JSON object matching this exact schema:
 {{
-  "summary": "2-3 sentences summarizing the overall news situation from the past hour in English.",
+  "summary": "A comprehensive and detailed 4-7 sentences paragraph summarizing the overall news situation from the past hour in English, providing broader context and covering the main developments thoroughly.",
   "categories": [
     {{
       "name": "Security" | "Politics" | "Economy" | "General",
@@ -198,6 +199,19 @@ Raw intercept data:
             # Inject the exact server generation time
             gen_tz = timezone(timedelta(hours=2))
             data["generated_at"] = datetime.now(gen_tz).strftime("%H:%M")
+            
+            # Save to redis based on lang
+            redis_url = os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL")
+            if redis_url:
+                try:
+                    r = redis.from_url(redis_url)
+                    current_ts = int(datetime.now(timezone.utc).timestamp())
+                    key = f"news_history_{lang}"
+                    r.zadd(key, {json.dumps(data, ensure_ascii=False): current_ts})
+                    # Keep max 24 hours (86400 seconds)
+                    r.zremrangebyscore(key, "-inf", current_ts - 86400)
+                except Exception as e:
+                    print(f"Redis save error: {e}")
             
             self.send_json(data)
             

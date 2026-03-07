@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FocusNews - חדשות ממוקדות מבצע "שאגת הארי" </title>
+    <title>FocusNews - מבצע "שאגת הארי" </title>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <meta name="description" content="FocusNews - במקום לפתוח כל דקה את הטלגרם, כאן יש סיכום שעתי ">
+    <meta name="description" content="FocusNews">
 </head>
 
 <body>
@@ -25,6 +25,13 @@
                     <button id="lang-toggle" class="icon-btn lang-btn" aria-label="החלף שפה">
                         <span id="lang-icon">🌐</span> <span id="lang-text" class="btn-text">English</span>
                     </button>
+                    <div style="position: relative;">
+                        <span
+                            style="position: absolute; right: 10px; top: 7px; pointer-events: none; font-size:14px;">🕰️</span>
+                        <select id="history-selector" class="history-select icon-btn">
+                            <!-- Options injected via JS -->
+                        </select>
+                    </div>
                 </div>
                 <div class="top-viewers-container" style="display: flex; gap: 10px;">
                     <div class="top-viewers" title="צופים כעת">
