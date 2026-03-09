@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Module-scope state
     let lastFetchTime = null;
+    let loadingPhaseInterval = null;
 
     // Dictionary for Translations
     const i18n = {
@@ -61,7 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
             copyBtn: "העתק",
             copiedBtn: "הועתק!",
             nextUpdateIn: "עדכון הבא בעוד",
-            criticalLabel: "קריטי"
+            criticalLabel: "קריטי",
+            retryBtn: "נסה שוב",
+            staleBanner: "⚠️ מציג נתונים ממאגר — השרת לא הגיב, נסה שוב בעוד כמה דקות",
+            loadingPhases: ["סורק ערוצי טלגרם...", "מנתח ומצליב דיווחים...", "מייצר סיכום AI..."]
         },
         en: {
             title: "FocusNews - Operation Lion's Roar",
@@ -97,7 +101,10 @@ document.addEventListener('DOMContentLoaded', () => {
             copyBtn: "Copy",
             copiedBtn: "Copied!",
             nextUpdateIn: "Next update in",
-            criticalLabel: "CRITICAL"
+            criticalLabel: "CRITICAL",
+            retryBtn: "Try Again",
+            staleBanner: "⚠️ Showing cached data — server didn't respond, try again in a few minutes",
+            loadingPhases: ["Scanning Telegram channels...", "Cross-referencing reports...", "Generating AI summary..."]
         }
     };
 
@@ -168,7 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('#loading-state h3').innerText = dict.loadingTitle;
         document.querySelector('#loading-state p').innerText = dict.loadingDesc;
         document.querySelector('#error-state h3').innerText = dict.errorTitle;
-        if (shareWhatsappBtn) shareWhatsappBtn.innerHTML = shareWhatsappBtn.innerHTML.replace(/.*<\/svg>\s*.*/s, document.querySelector('#share-whatsapp-btn svg').outerHTML + ' ' + dict.shareBtn);
+        const whatsappText = document.getElementById('whatsapp-text');
+        if (whatsappText) whatsappText.innerText = dict.shareBtn;
         document.querySelector('.timeline-section h3').innerHTML = `<i class="icon">⏱️</i> ${dict.timelineTitle.replace('⏱️ ', '')}`;
         document.getElementById('monitored-sources-title').innerHTML = dict.sourcesTitle;
 
@@ -181,6 +189,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (refreshLabel) refreshLabel.innerText = dict.refreshBtn;
         const copyLabel = document.getElementById('copy-label');
         if (copyLabel) copyLabel.innerText = dict.copyBtn;
+        const retryLabel = document.getElementById('retry-label');
+        if (retryLabel) retryLabel.innerText = dict.retryBtn;
+        const loadingTitleEl = document.getElementById('loading-title');
+        if (loadingTitleEl) loadingTitleEl.innerText = dict.loadingTitle;
+        const loadingDescEl = document.getElementById('loading-desc');
+        if (loadingDescEl) loadingDescEl.innerText = dict.loadingDesc;
 
         updateHistoryDropdown();
         updateFreshnessDot();
@@ -255,15 +269,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // ── Loading phase cycling ──
+    const startLoadingPhases = () => {
+        const phaseEl = document.getElementById('loading-phase');
+        if (!phaseEl) return;
+        const phases = i18n[currentLang].loadingPhases;
+        let i = 0;
+        phaseEl.textContent = phases[0];
+        loadingPhaseInterval = setInterval(() => {
+            i = (i + 1) % phases.length;
+            phaseEl.textContent = phases[i];
+        }, 2500);
+    };
+
+    const stopLoadingPhases = () => {
+        if (loadingPhaseInterval) { clearInterval(loadingPhaseInterval); loadingPhaseInterval = null; }
+        const phaseEl = document.getElementById('loading-phase');
+        if (phaseEl) phaseEl.textContent = '';
+    };
+
+    // ── Stale data banner ──
+    const setStaleBanner = (isStale) => {
+        const banner = document.getElementById('stale-banner');
+        const msg = document.getElementById('stale-msg');
+        if (!banner) return;
+        if (isStale) {
+            if (msg) msg.textContent = i18n[currentLang].staleBanner;
+            banner.classList.remove('hidden');
+        } else {
+            banner.classList.add('hidden');
+        }
+    };
+
     const showLoading = () => {
         setRefreshLoading(true);
         dashboardData.classList.add('hidden');
         errorState.classList.add('hidden');
         loadingState.classList.remove('hidden');
+        startLoadingPhases();
     };
 
     const showError = (msg) => {
         setRefreshLoading(false);
+        stopLoadingPhases();
         loadingState.classList.add('hidden');
         dashboardData.classList.add('hidden');
         errorState.classList.remove('hidden');
@@ -272,6 +320,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderDashboard = (data) => {
         setRefreshLoading(false);
+        stopLoadingPhases();
+        setStaleBanner(data.stale === true);
         loadingState.classList.add('hidden');
         errorState.classList.add('hidden');
 
@@ -603,6 +653,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (copySummaryBtn) {
         copySummaryBtn.addEventListener('click', copySummary);
+    }
+
+    const retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) {
+        retryBtn.addEventListener('click', fetchUpdates);
     }
 
     const historySelector = document.getElementById('history-selector');

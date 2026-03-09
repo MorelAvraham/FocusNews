@@ -63,7 +63,7 @@ def call_gemini(prompt, api_key):
     """Call Gemini REST API directly — no SDK needed."""
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.5-flash:generateContent?key={api_key}"
+        f"gemini-2.0-flash:generateContent?key={api_key}"
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -72,7 +72,7 @@ def call_gemini(prompt, api_key):
             "temperature": 0.2
         }
     }
-    resp = requests.post(url, json=payload, timeout=25)
+    resp = requests.post(url, json=payload, timeout=8)
     resp.raise_for_status()
     data = resp.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -229,6 +229,21 @@ class handler(BaseHTTPRequestHandler):
             self.send_json(data)
 
         except Exception as e:
+            print(f"Gemini error: {e}")
+            # Fallback: serve any cached data (even stale) rather than a hard 500
+            if r:
+                try:
+                    key = f"news_history_{lang}"
+                    stale = r.zrangebyscore(key, "-inf", "+inf", withscores=True)
+                    if stale:
+                        best = max(stale, key=lambda x: x[1])
+                        record_str = best[0].decode('utf-8') if isinstance(best[0], bytes) else str(best[0])
+                        data = json.loads(record_str)
+                        data["stale"] = True
+                        self.send_json(data)
+                        return
+                except Exception:
+                    pass
             self.send_json({"error": str(e)}, 500)
 
     def send_json(self, data, status=200):
