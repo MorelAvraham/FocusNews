@@ -13,9 +13,9 @@ def fetch_telegram_messages(channel):
     url = f"https://t.me/s/{channel}"
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
-        response = requests.get(url, headers=headers, timeout=3)
+        response = requests.get(url, headers=headers, timeout=2)
         if response.status_code != 200:
             return []
 
@@ -72,7 +72,8 @@ def call_gemini(prompt, api_key):
             "temperature": 0.2
         }
     }
-    resp = requests.post(url, json=payload, timeout=25)
+    # Keep Gemini timeout strictly under 8s to prevent Vercel 504 errors
+    resp = requests.post(url, json=payload, timeout=8)
     resp.raise_for_status()
     data = resp.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -139,16 +140,17 @@ class handler(BaseHTTPRequestHandler):
         if redis_url:
             try:
                 r = redis.from_url(redis_url)
-                now_ts = int(datetime.now(timezone.utc).timestamp())
-                cutoff = now_ts - 3300  # 55 minutes
-                key = f"news_history_{lang}"
-                recent = r.zrangebyscore(key, cutoff, "+inf", withscores=True)
-                if recent:
-                    best = max(recent, key=lambda x: x[1])
-                    record_str = best[0].decode('utf-8') if isinstance(best[0], bytes) else str(best[0])
-                    data = json.loads(record_str)
-                    self.send_json(data)
-                    return
+                if r is not None:
+                    now_ts = int(datetime.now(timezone.utc).timestamp())
+                    cutoff = now_ts - 3300  # 55 minutes
+                    key = f"news_history_{lang}"
+                    recent = r.zrangebyscore(key, cutoff, "+inf", withscores=True)
+                    if recent:
+                        best = max(recent, key=lambda x: x[1])
+                        record_str = best[0].decode('utf-8') if isinstance(best[0], bytes) else str(best[0])
+                        data = json.loads(record_str)
+                        self.send_json(data)
+                        return
             except Exception as e:
                 print(f"Redis cache read error: {e}")
 
@@ -160,9 +162,11 @@ class handler(BaseHTTPRequestHandler):
 
         all_messages = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            # type: ignore
             futures = {executor.submit(fetch_telegram_messages, c): c for c in channels}
             try:
-                for future in concurrent.futures.as_completed(futures, timeout=8):
+                # Give Telegram fetches max 3.5s total to leave time for Gemini
+                for future in concurrent.futures.as_completed(futures, timeout=3.5):
                     try:
                         msgs = future.result()
                         all_messages.extend(msgs)
@@ -215,7 +219,7 @@ class handler(BaseHTTPRequestHandler):
             gen_time = datetime.now(gen_tz).strftime("%H:%M")
 
             # Save BOTH languages to Redis in one shot
-            if r:
+            if r is not None:
                 try:
                     for lng in ('he', 'en'):
                         if lng in both:
@@ -234,7 +238,7 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"Gemini error: {e}")
             # Fallback: serve any cached data (even stale) rather than a hard 500
-            if r:
+            if r is not None:
                 try:
                     key = f"news_history_{lang}"
                     stale = r.zrangebyscore(key, "-inf", "+inf", withscores=True)
