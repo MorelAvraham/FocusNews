@@ -26,87 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastFetchTime = null;
     let loadingPhaseInterval = null;
 
-    // Dictionary for Translations
-    const i18n = {
-        he: {
-            title: "FocusNews - חדשות ממוקדות מבצע : שאגת הארי ",
-            subtitle: "להישאר מעודכנים, בלי להישאב לטלגרם. פעם בשעה!",
-            desc: "איסוף, הצלבה וסינון של דיווחים מהשטח באמצעות בינה מלאכותית. העדכונים הקריטיים בלבד, מוגשים בכל שעה עגולה.",
-            statusLabel: "עומס דיווחים:",
-            loadingStatus: "מחשב נתונים...",
-            refreshBtn: "סריקה מחדש",
-            loadingTitle: "מעבד חדשות...",
-            loadingDesc: "מפעיל מערכת בינה מלאכותית לאיסוף וסינון דיווחים מהשעה האחרונה.",
-            errorTitle: "שגיאה בתקשורת נתונים",
-            shareBtn: "שתף תקציר ל-WhatsApp",
-            timelineTitle: "⏱️ ציר זמן מאומת (השעה האחרונה)",
-            sourcesTitle: "מקורות מנוטרים <span>(8/8 פעילים)</span>",
-            lastTestedTemplate: "עדכון אחרון: ",
-            autoUpdateNote: "הנתונים מתעדכנים אוטומטית בכל שעה",
-            noEvents: "אין עדכונים חריגים",
-            noCategories: "לא נמצאו דיווחים חדשים לחלוקה לקטגוריות.",
-            noTimeline: "לא זוהו אירועים הדורשים ציון בציר הזמן בשעה האחרונה.",
-            routine: "שגרה",
-            tension: "תנועה ערה",
-            escalation: "עומס דיווחים",
-            serverError: "שגיאת שרת",
-            themeDark: "מצב לילה",
-            themeLight: "מצב יום",
-            langName: "English",
-            liveLabel: "אונליין",
-            viewsLabel: "כניסות",
-            summaryTitle: "סיכום AI (מבט על)",
-            historyNow: "עכשיו",
-            historyHourAgo: "לפני שעה",
-            historyHoursAgo: "לפני {h} שעות",
-            copyBtn: "העתק",
-            copiedBtn: "הועתק!",
-            nextUpdateIn: "עדכון הבא בעוד",
-            criticalLabel: "קריטי",
-            retryBtn: "נסה שוב",
-            staleBanner: "⚠️ מציג נתונים ממאגר — השרת לא הגיב, נסה שוב בעוד כמה דקות",
-            loadingPhases: ["סורק ערוצי טלגרם...", "מנתח ומצליב דיווחים...", "מייצר סיכום AI..."]
-        },
-        en: {
-            title: "FocusNews - Operation Lion's Roar",
-            subtitle: "Stay updated without getting sucked into Telegram. Once an hour!",
-            desc: "AI-powered collection, cross-referencing, and filtering of field reports. Only the critical updates, delivered every hour on the hour.",
-            statusLabel: "News Volume:",
-            loadingStatus: "Processing...",
-            refreshBtn: "Rescan",
-            loadingTitle: "Analyzing News...",
-            loadingDesc: "Running AI engine to gather and filter reports from the last hour.",
-            errorTitle: "Connection Error",
-            shareBtn: "Share Summary to WhatsApp",
-            timelineTitle: "⏱️ Verified Timeline (Last Hour)",
-            sourcesTitle: "Monitored Sources <span>(8/8 Active)</span>",
-            lastTestedTemplate: "Last updated: ",
-            autoUpdateNote: "Data updates automatically every hour",
-            noEvents: "No unusual updates",
-            noCategories: "No new reports found to categorize.",
-            noTimeline: "No actionable events detected in the timeline for the last hour.",
-            routine: "Routine",
-            tension: "Active",
-            escalation: "Heavy Activity",
-            serverError: "Server Error",
-            themeDark: "Dark Mode",
-            themeLight: "Light Mode",
-            langName: "עברית",
-            liveLabel: "Online",
-            viewsLabel: "Views",
-            summaryTitle: "AI Summary (Overview)",
-            historyNow: "Current",
-            historyHourAgo: "1 Hour Ago",
-            historyHoursAgo: "{h} Hours Ago",
-            copyBtn: "Copy",
-            copiedBtn: "Copied!",
-            nextUpdateIn: "Next update in",
-            criticalLabel: "CRITICAL",
-            retryBtn: "Try Again",
-            staleBanner: "⚠️ Showing cached data — server didn't respond, try again in a few minutes",
-            loadingPhases: ["Scanning Telegram channels...", "Cross-referencing reports...", "Generating AI summary..."]
-        }
-    };
+    // i18n Dictionary is now sourced from translations.js
 
     let currentLang = localStorage.getItem('lang') || 'he';
 
@@ -262,6 +182,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             lastUpdatedEl.innerText = `${i18n[currentLang].lastTestedTemplate}${timeString} | ${i18n[currentLang].autoUpdateNote}`;
 
+            // Notification on unseen updates
+            if (document.hidden) {
+                document.title = i18n[currentLang].newUpdatesTab;
+            }
+
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
             showError(error.message);
@@ -303,15 +228,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const showLoading = () => {
         setRefreshLoading(true);
-        dashboardData.classList.add('hidden');
-        errorState.classList.add('hidden');
-        loadingState.classList.remove('hidden');
         startLoadingPhases();
+        
+        // Show the skeleton loader while keeping dashboard in DOM but hidden
+        loadingState.classList.remove('hidden');
+        errorState.classList.add('hidden');
+        dashboardData.classList.add('hidden');
     };
 
     const showError = (msg) => {
         setRefreshLoading(false);
         stopLoadingPhases();
+        
         loadingState.classList.add('hidden');
         dashboardData.classList.add('hidden');
         errorState.classList.remove('hidden');
@@ -400,10 +328,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     : '';
 
                 section.innerHTML = `
-                    <h3><i class="icon">${catIcon}</i> ${cat.name} ${countBadge}</h3>
+                    <h3 class="category-header" title="${i18n[currentLang].expand}/${i18n[currentLang].collapse}">
+                        <i class="icon">${catIcon}</i> ${cat.name} ${countBadge}
+                        <span class="category-toggle-icon">▼</span>
+                    </h3>
                     <ul class="category-list">${listHtml}</ul>
                 `;
                 categoriesContainer.appendChild(section);
+
+                // Add collapsible listener
+                const header = section.querySelector('.category-header');
+                const list = section.querySelector('.category-list');
+                header.addEventListener('click', () => {
+                    header.classList.toggle('collapsed');
+                    list.classList.toggle('collapsed');
+                });
             });
         } else {
             categoriesContainer.innerHTML = `
@@ -641,6 +580,68 @@ document.addEventListener('DOMContentLoaded', () => {
         const encodedText = encodeURIComponent(text);
         window.open(`https://wa.me/?text=${encodedText}`, '_blank');
     };
+
+    // ── Visibility API (Tab Title Notification) ──
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            document.title = i18n[currentLang].originalTab || "FocusNews";
+        }
+    });
+
+    // ── Back to Top Button ──
+    const backToTopBtn = document.createElement("button");
+    backToTopBtn.id = "back-to-top";
+    backToTopBtn.className = "icon-btn hidden";
+    backToTopBtn.style.position = "fixed";
+    backToTopBtn.style.bottom = "80px";
+    backToTopBtn.style.right = "20px";
+    backToTopBtn.style.zIndex = "1000";
+    backToTopBtn.style.background = "var(--accent-blue)";
+    backToTopBtn.style.color = "#fff";
+    backToTopBtn.style.padding = "10px 15px";
+    backToTopBtn.style.boxShadow = "var(--shadow-soft)";
+    backToTopBtn.innerHTML = `<span>${i18n[currentLang].backToTop || '⏫ Back to Top'}</span>`;
+    document.body.appendChild(backToTopBtn);
+
+    backToTopBtn.style[document.documentElement.dir === 'rtl' ? 'left' : 'right'] = '20px';
+
+    window.addEventListener("scroll", () => {
+        if (window.scrollY > 400) {
+            backToTopBtn.classList.remove("hidden");
+        } else {
+            backToTopBtn.classList.add("hidden");
+        }
+    });
+
+    backToTopBtn.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    // ── Pull to Refresh ──
+    let touchStartY = 0;
+    let touchEndY = 0;
+    let isPulling = false;
+
+    document.addEventListener('touchstart', e => {
+        if (window.scrollY === 0) {
+            touchStartY = e.changedTouches[0].screenY;
+            isPulling = true;
+        }
+    }, {passive: true});
+
+    document.addEventListener('touchmove', e => {
+        if (!isPulling) return;
+        touchEndY = e.changedTouches[0].screenY;
+        // Optionally add visual feedback here if we wanted
+    }, {passive: true});
+
+    document.addEventListener('touchend', () => {
+        if (!isPulling) return;
+        if (touchEndY > touchStartY + 150) { // arbitrary 150px pull threshold
+            fetchUpdates();
+        }
+        isPulling = false;
+    });
 
     // ── Event Listeners ──
     if (shareWhatsappBtn) {

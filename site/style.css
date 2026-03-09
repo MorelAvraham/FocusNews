@@ -451,6 +451,53 @@ section h3 {
     }
 }
 
+/* ── Skeletons ── */
+.skeleton-dashboard {
+    width: 100%;
+}
+.skeleton-box {
+    background: linear-gradient(90deg, var(--card-border-glass) 25%, var(--card-bg-light) 50%, var(--card-border-glass) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 8px;
+}
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.category-skeleton {
+    height: 180px;
+}
+.timeline-skeleton {
+    height: 300px;
+    width: 100%;
+}
+
+/* ── Category Collapsing ── */
+.category-list.collapsed {
+    display: none;
+}
+.category-header {
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.2s;
+}
+.category-header:hover {
+    opacity: 0.8;
+}
+.category-toggle-icon {
+    font-size: 0.8rem;
+    margin-right: auto;
+    transition: transform 0.3s ease;
+}
+[dir="ltr"] .category-toggle-icon {
+    margin-right: 0;
+    margin-left: auto;
+}
+.category-header.collapsed .category-toggle-icon {
+    transform: rotate(180deg);
+}
+
 @keyframes pulse {
     0% {
         transform: scale(1);
@@ -605,11 +652,15 @@ section h3 {
 /* ── Timeline Urgency Levels ── */
 .timeline-marker-critical {
     background: var(--accent-red);
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
-    animation: pulse 1.5s infinite;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.8), 0 0 25px rgba(239, 68, 68, 0.4);
+    animation: critical-pulse 1.2s infinite alternate;
     width: 16px;
     height: 16px;
     margin-top: 17px;
+}
+@keyframes critical-pulse {
+    0% { transform: scale(1); box-shadow: 0 0 12px rgba(239, 68, 68, 0.8); }
+    100% { transform: scale(1.3); box-shadow: 0 0 25px rgba(239, 68, 68, 1); }
 }
 .timeline-marker-notable {
     background: var(--accent-orange);
@@ -763,9 +814,35 @@ section h3 {
         font-size: 2rem;
     }
 
-    .whatsapp-btn {
-        width: 100%;
+    /* Sticky Actions for Mobile */
+    .actions-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--card-bg-glass);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid var(--card-border-glass);
+        padding: 10px 15px;
+        z-index: 1000;
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-around !important;
+        box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 0 !important;
+    }
+    
+    body {
+        padding-bottom: 70px; /* Space for sticky bar */
+    }
+
+    .refresh-btn, .whatsapp-btn {
+        flex: 1;
         justify-content: center;
+        margin: 0 5px;
+        padding: 10px 0;
+        font-size: 0.95rem;
     }
 }
 

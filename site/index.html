@@ -9,6 +9,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script>
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    </script>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
     <meta name="description" content="FocusNews - סינון חכם של דיווחים ביטחוניים בזמן אמת. עדכון אוטומטי פעם בשעה, ללא רעש.">
@@ -73,12 +79,23 @@
         </header>
 
         <main id="dashboard-content" class="dashboard-grid">
-            <!-- Loading State -->
+            <!-- Loading State with Skeletons -->
             <div id="loading-state" class="glass-panel text-center full-width">
                 <div class="radar-spinner"></div>
-                <h3 class="mb-2" id="loading-title">מנתח דיווחי מודיעין ורשתות...</h3>
-                <p id="loading-desc">מפעיל מנוע AI לאיסוף והצלבת הנתונים מהשעה האחרונה.</p>
-                <p id="loading-phase" style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.25rem; min-height:1.2em;"></p>
+                <h3 class="mb-2" id="loading-title" style="display:none;">מנתח דיווחי מודיעין ורשתות...</h3>
+                <p id="loading-desc" style="display:none;">מפעיל מנוע AI לאיסוף והצלבת הנתונים מהשעה האחרונה.</p>
+                <p id="loading-phase" style="font-size:1rem; color:var(--text-primary); font-weight:bold; margin-bottom:1.5rem; min-height:1.2em;"></p>
+                
+                <!-- Skeleton Sudo-Dashboard -->
+                <div class="skeleton-dashboard">
+                    <div class="skeleton-container grid-layout mb-4">
+                        <div class="skeleton-box category-skeleton"></div>
+                        <div class="skeleton-box category-skeleton"></div>
+                        <div class="skeleton-box category-skeleton"></div>
+                        <div class="skeleton-box category-skeleton"></div>
+                    </div>
+                    <div class="skeleton-box timeline-skeleton mt-4"></div>
+                </div>
             </div>
 
             <!-- Error State -->
@@ -167,7 +184,7 @@
             </div>
         </footer>
     </div>
-
+    <script src="translations.js"></script>
     <script src="app.js"></script>
 </body>
 
