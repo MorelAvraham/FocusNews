@@ -15,7 +15,7 @@ def fetch_telegram_messages(channel):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
         }
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=3)
         if response.status_code != 200:
             return []
 
@@ -72,7 +72,7 @@ def call_gemini(prompt, api_key):
             "temperature": 0.2
         }
     }
-    resp = requests.post(url, json=payload, timeout=8)
+    resp = requests.post(url, json=payload, timeout=5)
     resp.raise_for_status()
     data = resp.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -161,7 +161,7 @@ class handler(BaseHTTPRequestHandler):
         all_messages = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             futures = {executor.submit(fetch_telegram_messages, c): c for c in channels}
-            for future in concurrent.futures.as_completed(futures, timeout=6):
+            for future in concurrent.futures.as_completed(futures, timeout=3):
                 try:
                     msgs = future.result()
                     all_messages.extend(msgs)
