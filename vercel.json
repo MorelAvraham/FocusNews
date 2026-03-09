@@ -1,6 +1,10 @@
 {
   "version": 2,
-  "maxDuration": 60,
+  "functions": {
+    "api/*.py": {
+      "maxDuration": 60
+    }
+  },
   "builds": [
     {
       "src": "api/*.py",
