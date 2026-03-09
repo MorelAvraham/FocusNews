@@ -72,7 +72,7 @@ def call_gemini(prompt, api_key):
             "temperature": 0.2
         }
     }
-    resp = requests.post(url, json=payload, timeout=5)
+    resp = requests.post(url, json=payload, timeout=25)
     resp.raise_for_status()
     data = resp.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -161,12 +161,15 @@ class handler(BaseHTTPRequestHandler):
         all_messages = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             futures = {executor.submit(fetch_telegram_messages, c): c for c in channels}
-            for future in concurrent.futures.as_completed(futures, timeout=3):
-                try:
-                    msgs = future.result()
-                    all_messages.extend(msgs)
-                except Exception as e:
-                    print(f"Failed fetching channel: {e}")
+            try:
+                for future in concurrent.futures.as_completed(futures, timeout=8):
+                    try:
+                        msgs = future.result()
+                        all_messages.extend(msgs)
+                    except Exception as e:
+                        print(f"Failed fetching channel: {e}")
+            except concurrent.futures.TimeoutError:
+                print("Telegram fetch timed out partially.")
 
         all_messages.sort(key=lambda x: x.get('time', ''))
 
