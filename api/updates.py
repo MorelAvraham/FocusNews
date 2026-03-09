@@ -4,7 +4,6 @@ import requests
 from bs4 import BeautifulSoup
 import os
 import redis
-import google.generativeai as genai
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
 import concurrent.futures
@@ -16,7 +15,7 @@ def fetch_telegram_messages(channel):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=5)
         if response.status_code != 200:
             return []
 
@@ -58,6 +57,25 @@ def fetch_telegram_messages(channel):
     except Exception as e:
         print(f"Error fetching {channel}: {e}")
         return []
+
+
+def call_gemini(prompt, api_key):
+    """Call Gemini REST API directly — no SDK needed."""
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-2.5-flash:generateContent?key={api_key}"
+    )
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "temperature": 0.2
+        }
+    }
+    resp = requests.post(url, json=payload, timeout=25)
+    resp.raise_for_status()
+    data = resp.json()
+    return data["candidates"][0]["content"]["parts"][0]["text"]
 
 
 def build_prompt(combined_text):
@@ -134,7 +152,7 @@ class handler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f"Redis cache read error: {e}")
 
-        # --- 2. FETCH TELEGRAM ---
+        # --- 2. FETCH TELEGRAM (5s timeout per channel to stay within Vercel limits) ---
         channels = [
             "abualiexpress", "amitsegal", "miraedj", "ziv710",
             "salehdesk1", "arabworld301news", "GLOBAL_Telegram_MOKED", "New_security8200"
@@ -142,8 +160,8 @@ class handler(BaseHTTPRequestHandler):
 
         all_messages = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            future_to_channel = {executor.submit(fetch_telegram_messages, c): c for c in channels}
-            for future in concurrent.futures.as_completed(future_to_channel):
+            futures = {executor.submit(fetch_telegram_messages, c): c for c in channels}
+            for future in concurrent.futures.as_completed(futures, timeout=6):
                 try:
                     msgs = future.result()
                     all_messages.extend(msgs)
@@ -160,7 +178,7 @@ class handler(BaseHTTPRequestHandler):
             self.send_json(fallback.get(lang, fallback['he']))
             return
 
-        # --- 3. PREPARE TEXT ---
+        # --- 3. PREPARE TEXT (12000 char limit to keep Gemini fast) ---
         israel_tz = timezone(timedelta(hours=2))
         combined_text_parts = []
         for m in all_messages:
@@ -176,28 +194,18 @@ class handler(BaseHTTPRequestHandler):
             combined_text_parts.append(f"[{time_hm}] Source: {m['channel']}\n{m['text']}")
 
         combined_text = "\n\n---\n\n".join(combined_text_parts)
-        if len(combined_text) > 15000:
-            combined_text = combined_text[:15000]
+        if len(combined_text) > 12000:
+            combined_text = combined_text[:12000]
 
-        # --- 4. CALL GEMINI (generates BOTH languages in one call) ---
+        # --- 4. CALL GEMINI via REST (no SDK = small bundle) ---
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             self.send_json({"error": "No GEMINI_API_KEY environment variable provided."}, 500)
             return
 
-        genai.configure(api_key=api_key)
-        prompt = build_prompt(combined_text)
-
         try:
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
-                    response_mime_type="application/json",
-                )
-            )
-
-            both = json.loads(response.text)
+            result_json = call_gemini(build_prompt(combined_text), api_key)
+            both = json.loads(result_json)
 
             gen_tz = timezone(timedelta(hours=2))
             now_ts = int(datetime.now(timezone.utc).timestamp())

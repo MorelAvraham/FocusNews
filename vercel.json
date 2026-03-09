@@ -31,15 +31,5 @@
       "src": "/",
       "dest": "/site/index.html"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/updates?lang=he",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/updates?lang=en",
-      "schedule": "0 * * * *"
-    }
   ]
 }
