@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, parse_qs
 import concurrent.futures
 
+
 def fetch_telegram_messages(channel):
     url = f"https://t.me/s/{channel}"
     try:
@@ -18,34 +19,31 @@ def fetch_telegram_messages(channel):
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200:
             return []
-            
+
         soup = BeautifulSoup(response.text, 'html.parser')
         messages = []
-        
-        # We only want messages from the last hour
+
         now = datetime.now(timezone.utc)
         one_hour_ago = now - timedelta(hours=1)
-        
+
         for block in soup.find_all('div', class_='tgme_widget_message'):
-            # Data Cleanup: remove views/meta stats to avoid noise
             for meta in block.find_all('span', class_='tgme_widget_message_meta'):
                 meta.decompose()
             for views in block.find_all('span', class_='tgme_widget_message_views'):
                 views.decompose()
-                
+
             text_el = block.find('div', class_='tgme_widget_message_text')
             if not text_el:
                 continue
-                
+
             text = text_el.get_text(separator=' \n ', strip=True)
             if not text:
                 continue
-                
+
             time_wrap = block.find('a', class_='tgme_widget_message_date')
             time_el = time_wrap.find('time') if time_wrap else None
             time_str = time_el.get('datetime') if time_el else ""
-            
-            # Check if within last hour
+
             if time_str:
                 try:
                     msg_time = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
@@ -53,24 +51,95 @@ def fetch_telegram_messages(channel):
                         continue
                 except Exception:
                     pass
-            
+
             messages.append({"channel": channel, "text": text, "time": time_str})
-            
+
         return messages
     except Exception as e:
         print(f"Error fetching {channel}: {e}")
         return []
 
+
+def build_prompt(combined_text):
+    return f"""You are an expert news editor for 'FocusNews' - a calm, neutral news aggregator covering the Israeli-Palestinian conflict and related regional events.
+Review the raw intercept reports from the last hour, cross-reference them, remove duplicates and noise, and produce a bilingual JSON output (Hebrew + English) in ONE response.
+
+## TIMELINE INSTRUCTIONS:
+- Build a chronological timeline of 5-15 notable events. Use a BROAD definition of notable.
+- INCLUDE: Targeted strikes or eliminations, IDF ground/air operations, significant rocket/missile barrages, large-scale red alerts in major cities (Beer Sheva, Tel Aviv, Haifa, Jerusalem), Home Front Command announcements, ceasefire/hostage deal updates, political or diplomatic statements, military movements, significant intelligence events.
+- EXCLUDE ONLY: Completely isolated single rocket alerts in small peripheral localities that have no follow-up or escalation context.
+- If the hour was eventful: include 10-15 events. If quieter: include 5-8 events. NEVER return fewer than 3 events unless there are truly zero military/political messages at all.
+- You MUST use the EXACT [HH:MM] timestamps from the raw data. Do not guess or invent times.
+- For each timeline event, assign a "level" field: "critical" (eliminations, major strikes, ceasefire/hostage deal changes, mass casualty events) | "notable" (IDF operations, political statements, large city alerts, Home Front Command updates) | "info" (routine confirmations, single alerts, minor updates).
+
+## OUTPUT FORMAT — respond with ONLY this JSON structure, no extra text:
+{{
+  "he": {{
+    "summary": "4-7 sentence paragraph in HEBREW summarizing the overall situation from the past hour with context.",
+    "categories": [
+      {{
+        "name": "ביטחון",
+        "items": [{{"text": "concise Hebrew item", "source": "channel_name"}}]
+      }}
+    ],
+    "timeline": [
+      {{"time": "HH:MM", "source": "channel_name", "event": "Short event description in HEBREW", "level": "critical|notable|info"}}
+    ]
+  }},
+  "en": {{
+    "summary": "4-7 sentence paragraph in ENGLISH summarizing the overall situation from the past hour with context.",
+    "categories": [
+      {{
+        "name": "Security",
+        "items": [{{"text": "concise English item", "source": "channel_name"}}]
+      }}
+    ],
+    "timeline": [
+      {{"time": "HH:MM", "source": "channel_name", "event": "Short event description in ENGLISH", "level": "critical|notable|info"}}
+    ]
+  }}
+}}
+
+Valid category names: Hebrew: "ביטחון" | "פוליטיקה" | "כלכלה" | "כללי" | English: "Security" | "Politics" | "Economy" | "General"
+
+Raw intercept data:
+{combined_text}
+"""
+
+
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         query_components = parse_qs(urlparse(self.path).query)
         lang = query_components.get('lang', ['he'])[0]
-        
+        if lang not in ('he', 'en'):
+            lang = 'he'
+
+        redis_url = os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL")
+        r = None
+
+        # --- 1. REDIS CACHE CHECK: serve if fresh data exists (<55 min old) ---
+        if redis_url:
+            try:
+                r = redis.from_url(redis_url)
+                now_ts = int(datetime.now(timezone.utc).timestamp())
+                cutoff = now_ts - 3300  # 55 minutes
+                key = f"news_history_{lang}"
+                recent = r.zrangebyscore(key, cutoff, "+inf", withscores=True)
+                if recent:
+                    best = max(recent, key=lambda x: x[1])
+                    record_str = best[0].decode('utf-8') if isinstance(best[0], bytes) else str(best[0])
+                    data = json.loads(record_str)
+                    self.send_json(data)
+                    return
+            except Exception as e:
+                print(f"Redis cache read error: {e}")
+
+        # --- 2. FETCH TELEGRAM ---
         channels = [
             "abualiexpress", "amitsegal", "miraedj", "ziv710",
             "salehdesk1", "arabworld301news", "GLOBAL_Telegram_MOKED", "New_security8200"
         ]
-        
+
         all_messages = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             future_to_channel = {executor.submit(fetch_telegram_messages, c): c for c in channels}
@@ -80,109 +149,45 @@ class handler(BaseHTTPRequestHandler):
                     all_messages.extend(msgs)
                 except Exception as e:
                     print(f"Failed fetching channel: {e}")
-                    
-        # Sort messages by time ascending (helps AI understand chronological timeline)
+
         all_messages.sort(key=lambda x: x.get('time', ''))
-            
+
         if not all_messages:
-            if lang == 'en':
-                fallback = {
-                    "categories": [
-                        {"name": "General", "items": ["No new reports gathered in the last hour from monitored sources."]}
-                    ],
-                    "timeline": []
-                }
-            else:
-                fallback = {
-                    "categories": [
-                        {"name": "כללי", "items": ["לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים."]}
-                    ],
-                    "timeline": []
-                }
-            self.send_json(fallback)
+            fallback = {
+                "he": {"summary": "לא נאספו דיווחים חדשים בשעה האחרונה.", "categories": [{"name": "כללי", "items": [{"text": "לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים.", "source": ""}]}], "timeline": []},
+                "en": {"summary": "No new reports gathered in the last hour.", "categories": [{"name": "General", "items": [{"text": "No new reports gathered in the last hour from monitored sources.", "source": ""}]}], "timeline": []}
+            }
+            self.send_json(fallback.get(lang, fallback['he']))
             return
 
-        # Prepare text for Gemini
-        combined_text_parts = []
+        # --- 3. PREPARE TEXT ---
         israel_tz = timezone(timedelta(hours=2))
+        combined_text_parts = []
         for m in all_messages:
             time_str = m['time']
             if time_str:
                 try:
                     dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
                     time_hm = dt.astimezone(israel_tz).strftime("%H:%M")
-                except:
+                except Exception:
                     time_hm = ""
             else:
                 time_hm = ""
             combined_text_parts.append(f"[{time_hm}] Source: {m['channel']}\n{m['text']}")
-            
+
         combined_text = "\n\n---\n\n".join(combined_text_parts)
-        
-        # Token protection: Hard-truncate to 15,000 characters
         if len(combined_text) > 15000:
             combined_text = combined_text[:15000]
 
+        # --- 4. CALL GEMINI (generates BOTH languages in one call) ---
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             self.send_json({"error": "No GEMINI_API_KEY environment variable provided."}, 500)
             return
-            
+
         genai.configure(api_key=api_key)
-        
-        prompt_hebrew = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
-Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, and provide a clean, categorized news summary in HEBREW.
-For the timeline, build a chronological timeline by selecting up to 5-10 highly significant events. Quality over quantity. If there are only 2 truly major events, only output 2. EXPLICITLY EXCLUDE from the timeline: Routine red alerts (אזעקות), standard rocket sirens, and routine hostile aircraft infiltrations (חדירת כלי טיס עוין/כתב"מים) UNLESS they resulted in exceptional massive destruction or major casualties. EXPLICITLY INCLUDE AND PRIORITIZE: Targeted assassinations of senior figures / eliminations (חיסולים ממוקדים / פגיעה בבכירים), Official updates or changes to Home Front Command guidelines (הנחיות פיקוד העורף), Major, unusual strategic IDF operations (e.g., ground maneuvers, massive preemptive air strikes), Significant political, diplomatic, or ceasefire announcements, and Exceptional mass casualty events or major infrastructure hits. Prioritize MACRO events over MICRO tactical reports. If it is a routine daily occurrence in the conflict, filter it out from the timeline. You MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
-Output MUST be ONLY a valid JSON object matching this exact schema:
-{{
-  "summary": "A comprehensive and detailed 4-7 sentences paragraph summarizing the overall news situation from the past hour in Hebrew, providing broader context and covering the main developments thoroughly.",
-  "categories": [
-    {{
-      "name": "ביטחון" | "פוליטיקה" | "כלכלה" | "כללי",
-      "items": [
-        {{
-          "text": "short string summarizing key distinct news item in this category",
-          "source": "channel_name"
-        }}
-      ]
-    }}
-  ],
-  "timeline": [
-    {{"time": "HH:MM", "source": "channel_name", "event": "Short description of a particularly interesting or critical event in Hebrew"}}
-  ]
-}}
+        prompt = build_prompt(combined_text)
 
-Raw intercept data:
-{combined_text}
-"""
-
-        prompt_english = f"""You are an expert news editor for 'FocusNews' - a calm, neutral, and clear news aggregator.
-Your task is to review the raw string intercepts from news sources in the last hour, cross-reference them, remove duplicates and noise, translate it all to ENGLISH, and provide a clean, categorized news summary in ENGLISH.
-For the timeline, build a chronological timeline by selecting up to 5-10 highly significant events. Quality over quantity. If there are only 2 truly major events, only output 2. EXPLICITLY EXCLUDE from the timeline: Routine red alerts (אזעקות), standard rocket sirens, and routine hostile aircraft infiltrations (חדירת כלי טיס עוין/כתב"מים) UNLESS they resulted in exceptional massive destruction or major casualties. EXPLICITLY INCLUDE AND PRIORITIZE: Targeted assassinations of senior figures / eliminations (חיסולים ממוקדים / פגיעה בבכירים), Official updates or changes to Home Front Command guidelines (הנחיות פיקוד העורף), Major, unusual strategic IDF operations (e.g., ground maneuvers, massive preemptive air strikes), Significant political, diplomatic, or ceasefire announcements, and Exceptional mass casualty events or major infrastructure hits. Prioritize MACRO events over MICRO tactical reports. If it is a routine daily occurrence in the conflict, filter it out from the timeline. You MUST strictly use the exact [HH:MM] timestamps provided in the raw data. Do not guess or invent times.
-Output MUST be ONLY a valid JSON object matching this exact schema:
-{{
-  "summary": "A comprehensive and detailed 4-7 sentences paragraph summarizing the overall news situation from the past hour in English, providing broader context and covering the main developments thoroughly.",
-  "categories": [
-    {{
-      "name": "Security" | "Politics" | "Economy" | "General",
-      "items": [
-        {{
-          "text": "short string summarizing key distinct news item in this category",
-          "source": "channel_name"
-        }}
-      ]
-    }}
-  ],
-  "timeline": [
-    {{"time": "HH:MM", "source": "channel_name", "event": "Short description of a particularly interesting or critical event in English"}}
-  ]
-}}
-
-Raw intercept data:
-{combined_text}
-"""
-        
-        prompt = prompt_english if lang == 'en' else prompt_hebrew
         try:
             model = genai.GenerativeModel('gemini-2.5-flash')
             response = model.generate_content(
@@ -191,38 +196,37 @@ Raw intercept data:
                     response_mime_type="application/json",
                 )
             )
-            
-            result_json = response.text
-            # Use json.loads to ensure it's valid JSON format and parseable
-            data = json.loads(result_json)
-            
-            # Inject the exact server generation time
+
+            both = json.loads(response.text)
+
             gen_tz = timezone(timedelta(hours=2))
-            data["generated_at"] = datetime.now(gen_tz).strftime("%H:%M")
-            
-            # Save to redis based on lang
-            redis_url = os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL")
-            if redis_url:
+            now_ts = int(datetime.now(timezone.utc).timestamp())
+            gen_time = datetime.now(gen_tz).strftime("%H:%M")
+
+            # Save BOTH languages to Redis in one shot
+            if r:
                 try:
-                    r = redis.from_url(redis_url)
-                    current_ts = int(datetime.now(timezone.utc).timestamp())
-                    key = f"news_history_{lang}"
-                    r.zadd(key, {json.dumps(data, ensure_ascii=False): current_ts})
-                    # Keep max 24 hours (86400 seconds)
-                    r.zremrangebyscore(key, "-inf", current_ts - 86400)
+                    for lng in ('he', 'en'):
+                        if lng in both:
+                            entry = dict(both[lng])
+                            entry["generated_at"] = gen_time
+                            key = f"news_history_{lng}"
+                            r.zadd(key, {json.dumps(entry, ensure_ascii=False): now_ts})
+                            r.zremrangebyscore(key, "-inf", now_ts - 86400)
                 except Exception as e:
                     print(f"Redis save error: {e}")
-            
+
+            data = both.get(lang, both.get('he', {}))
+            data["generated_at"] = gen_time
             self.send_json(data)
-            
+
         except Exception as e:
             self.send_json({"error": str(e)}, 500)
-            
+
     def send_json(self, data, status=200):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
-        # Vercel Caching to run exactly once per hour
         self.send_header('Cache-Control', 's-maxage=3600, stale-while-revalidate=600')
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))

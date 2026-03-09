@@ -18,6 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const langIcon = document.getElementById('lang-icon');
     const langText = document.getElementById('lang-text');
 
+    const refreshBtn = document.getElementById('refresh-btn');
+    const refreshIcon = document.getElementById('refresh-icon');
+    const copySummaryBtn = document.getElementById('copy-summary-btn');
+
+    // Module-scope state
+    let lastFetchTime = null;
+
     // Dictionary for Translations
     const i18n = {
         he: {
@@ -50,7 +57,11 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryTitle: "סיכום AI (מבט על)",
             historyNow: "עכשיו",
             historyHourAgo: "לפני שעה",
-            historyHoursAgo: "לפני {h} שעות"
+            historyHoursAgo: "לפני {h} שעות",
+            copyBtn: "העתק",
+            copiedBtn: "הועתק!",
+            nextUpdateIn: "עדכון הבא בעוד",
+            criticalLabel: "קריטי"
         },
         en: {
             title: "FocusNews - Operation Lion's Roar",
@@ -82,7 +93,11 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryTitle: "AI Summary (Overview)",
             historyNow: "Current",
             historyHourAgo: "1 Hour Ago",
-            historyHoursAgo: "{h} Hours Ago"
+            historyHoursAgo: "{h} Hours Ago",
+            copyBtn: "Copy",
+            copiedBtn: "Copied!",
+            nextUpdateIn: "Next update in",
+            criticalLabel: "CRITICAL"
         }
     };
 
@@ -98,6 +113,49 @@ document.addEventListener('DOMContentLoaded', () => {
         'arabworld301news': 'עולם הערבים 301',
         'GLOBAL_Telegram_MOKED': 'מוקד טלגרם עולמי',
         'New_security8200': 'מודיעין 8200'
+    };
+
+    // ── Helper: animate number count-up ──
+    const animateCountUp = (el, target, duration = 600) => {
+        const start = parseInt(el.textContent) || 0;
+        const range = target - start;
+        if (range === 0 || isNaN(target)) { el.textContent = target; return; }
+        const startTime = performance.now();
+        const step = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(start + range * eased);
+            if (progress < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+    };
+
+    // ── Helper: set refresh button loading state ──
+    const setRefreshLoading = (isLoading) => {
+        if (!refreshBtn) return;
+        refreshBtn.disabled = isLoading;
+        if (refreshIcon) {
+            refreshIcon.style.animation = isLoading ? 'spin 0.8s linear infinite' : '';
+        }
+    };
+
+    // ── Freshness dot ──
+    const updateFreshnessDot = () => {
+        const dot = document.getElementById('freshness-dot');
+        if (!dot || !lastFetchTime) return;
+        const age = Math.floor((Date.now() - lastFetchTime) / 60000);
+        dot.style.display = 'inline-block';
+        if (age < 20) {
+            dot.style.background = 'var(--accent-green)';
+            dot.title = currentLang === 'he' ? (age < 1 ? 'רענן' : `בן ${age} דקות`) : (age < 1 ? 'Fresh' : `${age}m old`);
+        } else if (age < 50) {
+            dot.style.background = 'var(--accent-orange)';
+            dot.title = currentLang === 'he' ? `בן ${age} דקות` : `${age}m old`;
+        } else {
+            dot.style.background = 'var(--accent-red)';
+            dot.title = currentLang === 'he' ? 'עתיד להתעדכן בקרוב' : 'Due for update soon';
+        }
     };
 
     const updateUIText = () => {
@@ -119,7 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('viewers-label').innerText = dict.viewsLabel;
         document.getElementById('summary-title').innerText = dict.summaryTitle;
 
+        const refreshLabel = document.getElementById('refresh-label');
+        if (refreshLabel) refreshLabel.innerText = dict.refreshBtn;
+        const copyLabel = document.getElementById('copy-label');
+        if (copyLabel) copyLabel.innerText = dict.copyBtn;
+
         updateHistoryDropdown();
+        updateFreshnessDot();
 
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         themeText.innerText = isDark ? dict.themeLight : dict.themeDark;
@@ -192,12 +256,14 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showLoading = () => {
+        setRefreshLoading(true);
         dashboardData.classList.add('hidden');
         errorState.classList.add('hidden');
         loadingState.classList.remove('hidden');
     };
 
     const showError = (msg) => {
+        setRefreshLoading(false);
         loadingState.classList.add('hidden');
         dashboardData.classList.add('hidden');
         errorState.classList.remove('hidden');
@@ -205,9 +271,21 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderDashboard = (data) => {
+        setRefreshLoading(false);
         loadingState.classList.add('hidden');
         errorState.classList.add('hidden');
+
+        // Fade in the dashboard
+        dashboardData.style.opacity = '0';
         dashboardData.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            dashboardData.style.transition = 'opacity 0.3s ease';
+            dashboardData.style.opacity = '1';
+        });
+
+        // Record fetch time for freshness dot
+        lastFetchTime = Date.now();
+        updateFreshnessDot();
 
         // AI Summary
         const aiSummaryContainer = document.getElementById('ai-summary-container');
@@ -222,9 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // 1. Categories
         categoriesContainer.innerHTML = '';
         if (data.categories && data.categories.length > 0) {
-            data.categories.forEach(cat => {
+            data.categories.forEach((cat, idx) => {
                 const section = document.createElement('section');
-                section.className = 'glass-panel category-section';
+                section.className = 'glass-panel category-section animate-in';
+                section.style.animationDelay = `${idx * 60}ms`;
 
                 const iconMap = {
                     'ביטחון': '🛡️', 'Security': '🛡️',
@@ -242,7 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         let textStr = "";
                         let sourceStr = "";
 
-                        // Defensively support both old schema (string) and new schema (object)
                         if (typeof item === 'string') {
                             textStr = item;
                         } else {
@@ -265,8 +343,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     listHtml = `<li style="color:var(--text-secondary); border-color:transparent;">${i18n[currentLang].noEvents}</li>`;
                 }
 
+                // Count badge
+                const itemCount = cat.items ? cat.items.length : 0;
+                const countBadge = itemCount > 0
+                    ? `<span class="category-count-badge">${itemCount}</span>`
+                    : '';
+
                 section.innerHTML = `
-                    <h3><i class="icon">${catIcon}</i> ${cat.name}</h3>
+                    <h3><i class="icon">${catIcon}</i> ${cat.name} ${countBadge}</h3>
                     <ul class="category-list">${listHtml}</ul>
                 `;
                 categoriesContainer.appendChild(section);
@@ -279,29 +363,35 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
-        // 4. Verified Timeline
+        // 2. Verified Timeline
         timeline.innerHTML = '';
         if (data.timeline && data.timeline.length > 0) {
-            // Sort timeline chronologically to ensure it's displayed sequentially
             const sortedTimeline = [...data.timeline].sort((a, b) => {
                 const ta = a.time || "";
                 const tb = b.time || "";
                 return ta.localeCompare(tb);
             });
 
-            sortedTimeline.forEach(item => {
+            sortedTimeline.forEach((item, idx) => {
                 const tlItem = document.createElement('div');
-                tlItem.className = 'timeline-item';
+                const level = item.level || 'info';
+                tlItem.className = `timeline-item timeline-level-${level} animate-in`;
+                tlItem.style.animationDelay = `${idx * 50}ms`;
 
                 const timeStr = item.time || '';
                 const baseSource = item.source || 'Unknown';
                 const sourceStr = channelMap[baseSource] || baseSource;
                 const eventStr = item.event || '';
 
+                const criticalBadge = level === 'critical'
+                    ? `<span class="timeline-critical-badge">${i18n[currentLang].criticalLabel}</span>`
+                    : '';
+
                 tlItem.innerHTML = `
                     <div class="timeline-time">${timeStr}</div>
-                    <div class="timeline-marker"></div>
+                    <div class="timeline-marker timeline-marker-${level}"></div>
                     <div class="timeline-content glass-panel-light">
+                        ${criticalBadge}
                         <span class="timeline-source">${sourceStr}</span>
                         <p>${eventStr}</p>
                     </div>
@@ -317,11 +407,72 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // ── Countdown Timer + Auto-refresh ──
+    const initCountdown = () => {
+        const countdownEl = document.getElementById('countdown-timer');
+        if (!countdownEl) return;
+        let firedThisCycle = false;
+
+        const tick = () => {
+            const now = new Date();
+            const next = new Date(now);
+            next.setHours(next.getHours() + 1, 0, 0, 0);
+            const diffSec = Math.floor((next - now) / 1000);
+
+            // Reset guard after the trigger window
+            if (diffSec > 5) firedThisCycle = false;
+
+            const mm = String(Math.floor(diffSec / 60)).padStart(2, '0');
+            const ss = String(diffSec % 60).padStart(2, '0');
+            countdownEl.textContent = `${i18n[currentLang].nextUpdateIn} ${mm}:${ss}`;
+
+            // Auto-refresh at the top of the hour
+            if (diffSec <= 2 && !firedThisCycle) {
+                firedThisCycle = true;
+                fetchUpdates();
+            }
+
+            // Also update freshness dot every tick
+            updateFreshnessDot();
+        };
+
+        tick();
+        setInterval(tick, 1000);
+    };
+
+    // ── Copy Summary to Clipboard ──
+    const copySummary = async () => {
+        const text = document.getElementById('ai-summary-text')?.textContent?.trim();
+        if (!text) return;
+        const copyIcon = document.getElementById('copy-icon');
+        const copyLabel = document.getElementById('copy-label');
+        const copyToast = document.getElementById('copy-toast');
+
+        try {
+            await navigator.clipboard.writeText(text);
+
+            if (copyIcon) copyIcon.textContent = '✓';
+            if (copyLabel) copyLabel.textContent = i18n[currentLang].copiedBtn;
+
+            if (copyToast) {
+                copyToast.textContent = currentLang === 'he' ? '✓ הועתק ללוח' : '✓ Copied to clipboard';
+                copyToast.classList.remove('hidden');
+                setTimeout(() => copyToast.classList.add('hidden'), 2500);
+            }
+
+            setTimeout(() => {
+                if (copyIcon) copyIcon.textContent = '📋';
+                if (copyLabel) copyLabel.textContent = i18n[currentLang].copyBtn;
+            }, 2500);
+        } catch (e) {
+            console.warn('Clipboard write failed', e);
+        }
+    };
+
     const initLiveViewers = async () => {
         const liveViewersEl = document.getElementById('live-viewers');
         const totalViewersEl = document.getElementById('total-viewers');
 
-        // יצירת מזהה ייחודי ללקוח הזה
         const sessionId = Math.random().toString(36).substring(2, 15);
 
         const updateLiveCount = async () => {
@@ -329,23 +480,21 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const res = await fetch(`/api/viewers?id=${sessionId}`);
                 const data = await res.json();
-                liveViewersEl.innerText = data.live;
+                animateCountUp(liveViewersEl, data.live);
             } catch (e) {
                 console.error("Live viewers error", e);
             }
         };
 
-        // הפעלה ראשונה ואז כל 15 שניות
         updateLiveCount();
         setInterval(updateLiveCount, 15000);
 
-        // Counter API עבור סך הכל כניסות
         if (totalViewersEl) {
             try {
                 const res = await fetch('https://api.counterapi.dev/v1/FocusNews/views/up');
                 const data = await res.json();
                 if (data && data.count) {
-                    totalViewersEl.innerText = data.count.toLocaleString();
+                    animateCountUp(totalViewersEl, data.count);
                 }
             } catch (e) {
                 console.error("Counter API failed", e);
@@ -383,7 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentLang = currentLang === 'he' ? 'en' : 'he';
             localStorage.setItem('lang', currentLang);
             updateUIText();
-            fetchUpdates(); // Refresh data in new language
+            fetchUpdates();
         });
     };
 
@@ -443,8 +592,17 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open(`https://wa.me/?text=${encodedText}`, '_blank');
     };
 
+    // ── Event Listeners ──
     if (shareWhatsappBtn) {
         shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
+    }
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', fetchUpdates);
+    }
+
+    if (copySummaryBtn) {
+        copySummaryBtn.addEventListener('click', copySummary);
     }
 
     const historySelector = document.getElementById('history-selector');
@@ -452,9 +610,10 @@ document.addEventListener('DOMContentLoaded', () => {
         historySelector.addEventListener('change', fetchUpdates);
     }
 
-    // Initial load
+    // ── Initial load ──
     updateUIText();
     initThemeAndLang();
     initLiveViewers();
+    initCountdown();
     fetchUpdates();
 });

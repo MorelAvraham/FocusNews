@@ -577,6 +577,136 @@ section h3 {
     fill: #0077b5;
 }
 
+/* ── Refresh Button Disabled State ── */
+.refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+#refresh-icon {
+    display: inline-block;
+    transition: transform 0.1s;
+}
+
+/* ── Fade-In Animation ── */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.animate-in {
+    animation: fadeInUp 0.35s ease-out both;
+}
+
+/* ── Timeline Urgency Levels ── */
+.timeline-marker-critical {
+    background: var(--accent-red);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+    animation: pulse 1.5s infinite;
+    width: 16px;
+    height: 16px;
+    margin-top: 17px;
+}
+.timeline-marker-notable {
+    background: var(--accent-orange);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+.timeline-critical-badge {
+    display: inline-block;
+    background: var(--accent-red);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    align-self: flex-start;
+    margin-bottom: 2px;
+}
+.timeline-level-critical .timeline-content {
+    border-right: 3px solid var(--accent-red);
+}
+.timeline-level-notable .timeline-content {
+    border-right: 3px solid var(--accent-orange);
+}
+[dir="ltr"] .timeline-level-critical .timeline-content {
+    border-right: none;
+    border-left: 3px solid var(--accent-red);
+}
+[dir="ltr"] .timeline-level-notable .timeline-content {
+    border-right: none;
+    border-left: 3px solid var(--accent-orange);
+}
+
+/* ── Category Count Badge ── */
+.category-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    background: var(--accent-blue);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: bold;
+    border-radius: 11px;
+    padding: 0 6px;
+    vertical-align: middle;
+    margin-right: 2px;
+    opacity: 0.85;
+}
+[dir="ltr"] .category-count-badge {
+    margin-right: 0;
+    margin-left: 2px;
+}
+
+/* ── Copy Toast Notification ── */
+.copy-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-green);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 24px;
+    font-weight: bold;
+    font-size: 0.95rem;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    animation: fadeInUp 0.2s ease-out both;
+    white-space: nowrap;
+}
+#copy-summary-btn {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+}
+[dir="rtl"] #copy-summary-btn {
+    left: auto;
+    right: 1rem;
+}
+
+/* ── Freshness dot ── */
+#freshness-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 1s ease;
+}
+
+/* ── mb-4 utility (mirrors mt-4) ── */
+.mb-4 {
+    margin-bottom: 1rem;
+}
+
 /* Responsiveness */
 @media (max-width: 1100px) {
     .grid-layout {

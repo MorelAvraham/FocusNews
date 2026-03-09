@@ -54,8 +54,10 @@
             <h2>חדשות ממוקדות - מבצע "שאגת הארי" </h2>
             <p>מערכת חכמה לניתוח וסינון דיווחים, מתעדכנת כל שעה.</p>
 
-            <div class="status-bar" style="justify-content: center; border-top: none; padding-top: 0;">
+            <div class="status-bar" style="justify-content: center; border-top: none; padding-top: 0; gap: 12px; flex-wrap: wrap;">
                 <span id="last-updated">מאתחל מערכות...</span>
+                <span id="freshness-dot" title="" style="display:none;"></span>
+                <span id="countdown-timer" style="color:var(--accent-orange); font-weight:bold; font-size:0.85rem;"></span>
             </div>
         </header>
 
@@ -75,7 +77,11 @@
 
             <!-- Dashboard Sections (hidden until loaded) -->
             <div id="dashboard-data" class="hidden full-width">
-                <div class="actions-bar mb-4 text-center">
+                <div class="actions-bar mb-4 text-center" style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; align-items:center;">
+                    <button id="refresh-btn" class="refresh-btn icon-btn" aria-label="רענן נתונים">
+                        <span id="refresh-icon">🔄</span>
+                        <span id="refresh-label" class="btn-text">סריקה מחדש</span>
+                    </button>
                     <button id="share-whatsapp-btn" class="whatsapp-btn">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"
                             fill="currentColor">
@@ -86,10 +92,15 @@
                     </button>
                 </div>
 
-                <div id="ai-summary-container" class="glass-panel text-center full-width hidden mb-4">
+                <div id="ai-summary-container" class="glass-panel text-center full-width hidden mb-4" style="position:relative;">
                     <h3 style="justify-content: center;"><i class="icon">🤖</i> <span id="summary-title">סיכום AI (מבט
                             על)</span></h3>
                     <p id="ai-summary-text" style="font-size: 1.1rem; font-weight: 500;"></p>
+                    <button id="copy-summary-btn" class="icon-btn" title="העתק">
+                        <span id="copy-icon">📋</span>
+                        <span id="copy-label" class="btn-text">העתק</span>
+                    </button>
+                    <div id="copy-toast" class="copy-toast hidden"></div>
                 </div>
 
                 <div id="categories-container" class="grid-layout">
