@@ -1,0 +1,24 @@
+name: Hourly News Update
+
+on:
+  schedule:
+    # Runs every hour at minute 5 (e.g. 08:05, 09:05, 10:05...)
+    - cron: '5 * * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger cron endpoint
+        run: |
+          echo "Triggering FocusNews hourly update..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 55 \
+            "https://focus-news.vercel.app/api/cron")
+          echo "Response status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ge 500 ]; then
+            echo "Server error, but not failing the workflow"
+          fi
+          echo "Done!"
