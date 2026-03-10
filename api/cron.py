@@ -68,7 +68,7 @@ def call_gemini(prompt, api_key):
     """Call Gemini REST API directly."""
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-1.5-flash:generateContent?key={api_key}"
+        f"gemini-2.5-flash:generateContent?key={api_key}"
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -77,7 +77,7 @@ def call_gemini(prompt, api_key):
             "temperature": 0.2
         }
     }
-    resp = requests.post(url, json=payload, timeout=25)
+    resp = requests.post(url, json=payload, timeout=50)
     resp.raise_for_status()
     data = resp.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
