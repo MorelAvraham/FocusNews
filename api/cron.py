@@ -1,12 +1,17 @@
+"""
+Vercel Cron handler — called every hour by Vercel Cron Jobs.
+Forces a fresh update for BOTH languages (he + en) so that data
+in Redis is always fresh, even when no user visits the site.
+"""
+
 from http.server import BaseHTTPRequestHandler
 import json
 import requests
-from bs4 import BeautifulSoup
 import os
 import redis
-from datetime import datetime, timezone, timedelta
-from urllib.parse import urlparse, parse_qs
 import concurrent.futures
+from datetime import datetime, timezone, timedelta
+from bs4 import BeautifulSoup
 
 
 def fetch_telegram_messages(channel):
@@ -15,7 +20,7 @@ def fetch_telegram_messages(channel):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
-        response = requests.get(url, headers=headers, timeout=2)
+        response = requests.get(url, headers=headers, timeout=5)
         if response.status_code != 200:
             return []
 
@@ -60,7 +65,7 @@ def fetch_telegram_messages(channel):
 
 
 def call_gemini(prompt, api_key):
-    """Call Gemini REST API directly — no SDK needed."""
+    """Call Gemini REST API directly."""
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"gemini-2.0-flash:generateContent?key={api_key}"
@@ -72,8 +77,7 @@ def call_gemini(prompt, api_key):
             "temperature": 0.2
         }
     }
-    # Keep Gemini timeout strictly under 8s to prevent Vercel 504 errors
-    resp = requests.post(url, json=payload, timeout=8)
+    resp = requests.post(url, json=payload, timeout=25)
     resp.raise_for_status()
     data = resp.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -128,33 +132,24 @@ Raw intercept data:
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        query_components = parse_qs(urlparse(self.path).query)
-        lang = query_components.get('lang', ['he'])[0]
-        if lang not in ('he', 'en'):
-            lang = 'he'
-
+        """
+        Cron endpoint — fetches Telegram, calls Gemini, saves BOTH
+        languages to Redis. Returns a simple status JSON.
+        """
         redis_url = os.environ.get("UPSTASH_REDIS_URL") or os.environ.get("REDIS_URL")
-        r = None
+        api_key = os.environ.get("GEMINI_API_KEY")
 
-        # --- 1. REDIS CACHE CHECK: serve if fresh data exists (<55 min old) ---
-        if redis_url:
-            try:
-                r = redis.from_url(redis_url)
-                if r is not None:
-                    now_ts = int(datetime.now(timezone.utc).timestamp())
-                    cutoff = now_ts - 3300  # 55 minutes
-                    key = f"news_history_{lang}"
-                    recent = r.zrangebyscore(key, cutoff, "+inf", withscores=True)
-                    if recent:
-                        best = max(recent, key=lambda x: x[1])
-                        record_str = best[0].decode('utf-8') if isinstance(best[0], bytes) else str(best[0])
-                        data = json.loads(record_str)
-                        self.send_json(data)
-                        return
-            except Exception as e:
-                print(f"Redis cache read error: {e}")
+        if not redis_url or not api_key:
+            self.send_json({"error": "Missing UPSTASH_REDIS_URL or GEMINI_API_KEY"}, 500)
+            return
 
-        # --- 2. FETCH TELEGRAM (5s timeout per channel to stay within Vercel limits) ---
+        try:
+            r = redis.from_url(redis_url)
+        except Exception as e:
+            self.send_json({"error": f"Redis connection failed: {e}"}, 500)
+            return
+
+        # 1. Fetch Telegram channels
         channels = [
             "abualiexpress", "amitsegal", "miraedj", "ziv710",
             "salehdesk1", "arabworld301news", "GLOBAL_Telegram_MOKED", "New_security8200"
@@ -162,11 +157,9 @@ class handler(BaseHTTPRequestHandler):
 
         all_messages = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            # type: ignore
             futures = {executor.submit(fetch_telegram_messages, c): c for c in channels}
             try:
-                # Give Telegram fetches max 3.5s total to leave time for Gemini
-                for future in concurrent.futures.as_completed(futures, timeout=3.5):
+                for future in concurrent.futures.as_completed(futures, timeout=10):
                     try:
                         msgs = future.result()
                         all_messages.extend(msgs)
@@ -178,14 +171,36 @@ class handler(BaseHTTPRequestHandler):
         all_messages.sort(key=lambda x: x.get('time', ''))
 
         if not all_messages:
-            fallback = {
-                "he": {"summary": "לא נאספו דיווחים חדשים בשעה האחרונה.", "categories": [{"name": "כללי", "items": [{"text": "לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים.", "source": ""}]}], "timeline": []},
-                "en": {"summary": "No new reports gathered in the last hour.", "categories": [{"name": "General", "items": [{"text": "No new reports gathered in the last hour from monitored sources.", "source": ""}]}], "timeline": []}
-            }
-            self.send_json(fallback.get(lang, fallback['he']))
+            # Save a "no reports" entry so the cache is still fresh
+            now_ts = int(datetime.now(timezone.utc).timestamp())
+            gen_tz = timezone(timedelta(hours=2))
+            gen_time = datetime.now(gen_tz).strftime("%H:%M")
+            for lng in ('he', 'en'):
+                if lng == 'he':
+                    entry = {
+                        "summary": "לא נאספו דיווחים חדשים בשעה האחרונה.",
+                        "categories": [{"name": "כללי", "items": [{"text": "לא נאספו דיווחים חדשים בשעה האחרונה מהמקורות המנוטרים.", "source": ""}]}],
+                        "timeline": [],
+                        "generated_at": gen_time
+                    }
+                else:
+                    entry = {
+                        "summary": "No new reports gathered in the last hour.",
+                        "categories": [{"name": "General", "items": [{"text": "No new reports gathered in the last hour from monitored sources.", "source": ""}]}],
+                        "timeline": [],
+                        "generated_at": gen_time
+                    }
+                key = f"news_history_{lng}"
+                try:
+                    r.zadd(key, {json.dumps(entry, ensure_ascii=False): now_ts})
+                    r.zremrangebyscore(key, "-inf", now_ts - 86400)
+                except Exception as e:
+                    print(f"Redis save error: {e}")
+
+            self.send_json({"status": "ok", "result": "no_messages", "generated_at": gen_time})
             return
 
-        # --- 3. PREPARE TEXT (12000 char limit to keep Gemini fast) ---
+        # 2. Build combined text
         israel_tz = timezone(timedelta(hours=2))
         combined_text_parts = []
         for m in all_messages:
@@ -204,12 +219,7 @@ class handler(BaseHTTPRequestHandler):
         if len(combined_text) > 12000:
             combined_text = combined_text[:12000]
 
-        # --- 4. CALL GEMINI via REST (no SDK = small bundle) ---
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            self.send_json({"error": "No GEMINI_API_KEY environment variable provided."}, 500)
-            return
-
+        # 3. Call Gemini
         try:
             result_json = call_gemini(build_prompt(combined_text), api_key)
             both = json.loads(result_json)
@@ -218,45 +228,35 @@ class handler(BaseHTTPRequestHandler):
             now_ts = int(datetime.now(timezone.utc).timestamp())
             gen_time = datetime.now(gen_tz).strftime("%H:%M")
 
-            # Save BOTH languages to Redis in one shot
-            if r is not None:
-                try:
-                    for lng in ('he', 'en'):
-                        if lng in both:
-                            entry = dict(both[lng])
-                            entry["generated_at"] = gen_time
-                            key = f"news_history_{lng}"
-                            r.zadd(key, {json.dumps(entry, ensure_ascii=False): now_ts})
-                            r.zremrangebyscore(key, "-inf", now_ts - 86400)
-                except Exception as e:
-                    print(f"Redis save error: {e}")
+            # Save BOTH languages to Redis
+            saved_langs = []
+            for lng in ('he', 'en'):
+                if lng in both:
+                    entry = dict(both[lng])
+                    entry["generated_at"] = gen_time
+                    key = f"news_history_{lng}"
+                    try:
+                        r.zadd(key, {json.dumps(entry, ensure_ascii=False): now_ts})
+                        r.zremrangebyscore(key, "-inf", now_ts - 86400)
+                        saved_langs.append(lng)
+                    except Exception as e:
+                        print(f"Redis save error for {lng}: {e}")
 
-            data = both.get(lang, both.get('he', {}))
-            data["generated_at"] = gen_time
-            self.send_json(data)
+            self.send_json({
+                "status": "ok",
+                "result": "updated",
+                "saved_languages": saved_langs,
+                "message_count": len(all_messages),
+                "generated_at": gen_time
+            })
 
         except Exception as e:
-            print(f"Gemini error: {e}")
-            # Fallback: serve any cached data (even stale) rather than a hard 500
-            if r is not None:
-                try:
-                    key = f"news_history_{lang}"
-                    stale = r.zrangebyscore(key, "-inf", "+inf", withscores=True)
-                    if stale:
-                        best = max(stale, key=lambda x: x[1])
-                        record_str = best[0].decode('utf-8') if isinstance(best[0], bytes) else str(best[0])
-                        data = json.loads(record_str)
-                        data["stale"] = True
-                        self.send_json(data)
-                        return
-                except Exception:
-                    pass
-            self.send_json({"error": str(e)}, 500)
+            print(f"Cron Gemini error: {e}")
+            self.send_json({"error": f"Gemini failed: {str(e)}"}, 500)
 
     def send_json(self, data, status=200):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Cache-Control', 's-maxage=300, stale-while-revalidate=60')
+        self.send_header('Cache-Control', 'no-store, no-cache')
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))

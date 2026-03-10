@@ -1,21 +1,21 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "0 * * * *"
+    }
+  ],
   "functions": {
     "api/*.py": {
       "maxDuration": 60
     }
   },
-  "builds": [
-    {
-      "src": "api/*.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "site/**",
-      "use": "@vercel/static"
-    }
-  ],
   "routes": [
+    {
+      "src": "/api/cron",
+      "dest": "/api/cron.py"
+    },
     {
       "src": "/api/updates",
       "dest": "/api/updates.py"
