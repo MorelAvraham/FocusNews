@@ -74,10 +74,11 @@ def call_gemini(prompt, api_key):
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "temperature": 0.2
+            "temperature": 0.2,
+            "thinkingConfig": {"thinkingBudget": 0}
         }
     }
-    resp = requests.post(url, json=payload, timeout=50)
+    resp = requests.post(url, json=payload, timeout=45)
     resp.raise_for_status()
     data = resp.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
