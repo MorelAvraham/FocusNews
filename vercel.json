@@ -5,12 +5,6 @@
       "maxDuration": 60
     }
   },
-  "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "5 * * * *"
-    }
-  ],
   "routes": [
     {
       "src": "/api/cron",
