@@ -666,6 +666,21 @@ def find_fallback_time(item: Dict, raw_messages: List[Dict]) -> str:
     return ""
 
 
+def find_cluster_time(item: Dict, selected_clusters: List[Dict]) -> str:
+    candidate_sources = item.get("matched_sources") or ([item["source"]] if item.get("source") else [])
+    item_text = item.get("event") or item.get("text") or ""
+    for cluster in selected_clusters:
+        primary = cluster.get("primary", {})
+        cluster_sources = cluster.get("matched_sources", [])
+        same_source = any(source_id in cluster_sources for source_id in candidate_sources)
+        text_match = item_text and item_text[:60] in primary.get("text", "")
+        if same_source or text_match:
+            fallback = format_time_hm(primary.get("time", ""))
+            if fallback:
+                return fallback
+    return ""
+
+
 def normalize_item_metadata(item: Dict, lang: str, raw_messages: Optional[List[Dict]] = None) -> Dict:
     level = item.get("level") or "info"
     verification_status = item.get("verification_status") or "single_source"
@@ -728,6 +743,9 @@ def ensure_category_items(data: Dict, lang: str, selected_clusters: List[Dict]) 
 def ensure_timeline(data: Dict, lang: str, raw_messages: List[Dict], selected_clusters: List[Dict]) -> None:
     timeline = data.get("timeline") or []
     normalized_timeline = [normalize_item_metadata(item, lang, raw_messages) for item in timeline]
+    for item in normalized_timeline:
+        if not item.get("time"):
+            item["time"] = find_cluster_time(item, selected_clusters)
     if len(normalized_timeline) < 8:
         existing_events = {item.get("event") for item in normalized_timeline}
         for cluster in selected_clusters[:14]:
@@ -751,6 +769,9 @@ def ensure_timeline(data: Dict, lang: str, raw_messages: List[Dict], selected_cl
                     raw_messages,
                 )
             )
+    for item in normalized_timeline:
+        if not item.get("time"):
+            item["time"] = find_cluster_time(item, selected_clusters)
     data["timeline"] = normalized_timeline[:18]
 
 

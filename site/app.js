@@ -14,8 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeText = document.getElementById('theme-text');
     const langToggle = document.getElementById('lang-toggle');
     const langText = document.getElementById('lang-text');
-    const refreshBtn = document.getElementById('refresh-btn');
-    const refreshIcon = document.getElementById('refresh-icon');
     const copySummaryBtn = document.getElementById('copy-summary-btn');
 
     let currentLang = localStorage.getItem('lang') || 'he';
@@ -55,11 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const setRefreshLoading = (isLoading) => {
-        if (!refreshBtn) return;
-        refreshBtn.disabled = isLoading;
-        if (refreshIcon) {
-            refreshIcon.style.animation = isLoading ? 'spin 0.8s linear infinite' : '';
-        }
+        void isLoading;
     };
 
     const updateFreshnessDot = () => {
@@ -431,6 +425,12 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(tick, 1000);
     };
 
+    const initHourlyRefresh = () => {
+        setInterval(() => {
+            fetchUpdates();
+        }, 60 * 60 * 1000);
+    };
+
     const copySummary = async () => {
         const text = document.getElementById('ai-summary-text')?.textContent?.trim();
         if (!text) return;
@@ -631,5 +631,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initThemeAndLang();
     initLiveViewers();
     initCountdown();
+    initHourlyRefresh();
     fetchUpdates();
 });
