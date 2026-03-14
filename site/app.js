@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentData = null;
 
     const getDict = () => i18n[currentLang];
+    const sanitizeShareText = (value) => (value || '').replace(/[^\S\r\n]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 
     const levelIconMap = {
         critical: '🚨',
@@ -163,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         viewSelector.options[2].text = dict.viewRadar;
 
         langText.innerText = dict.langName;
+        updateControlHelp();
         updateHistoryDropdown();
         updateFreshnessDot();
 
@@ -171,6 +173,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentData) {
             applyViewState();
+        }
+    };
+
+    const updateControlHelp = () => {
+        const dict = getDict();
+        const filterHelp = document.getElementById('filter-help');
+        const topicHelp = document.getElementById('topic-help');
+        const viewHelp = document.getElementById('view-help');
+        const summary = document.getElementById('control-state-summary');
+
+        const filterHelpText = {
+            high: dict.filterHighHelp,
+            balanced: dict.filterBalancedHelp,
+            fast: dict.filterFastHelp
+        };
+
+        const viewHelpText = {
+            verified: dict.viewVerifiedHelp,
+            all: dict.viewAllHelp,
+            radar: dict.viewRadarHelp
+        };
+
+        if (filterHelp) filterHelp.innerText = filterHelpText[currentFilter] || dict.filterHighHelp;
+        if (topicHelp) topicHelp.innerText = dict.topicHelp;
+        if (viewHelp) viewHelp.innerText = viewHelpText[currentView] || dict.viewVerifiedHelp;
+        if (summary) {
+            summary.innerText = dict.controlStateSummary
+                .replace('{filter}', filterSelector.options[filterSelector.selectedIndex].text)
+                .replace('{topic}', topicSelector.options[topicSelector.selectedIndex].text)
+                .replace('{view}', viewSelector.options[viewSelector.selectedIndex].text);
         }
     };
 
@@ -642,20 +674,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const shareToWhatsapp = () => {
         const url = window.location.href.split('?')[0];
-        let text = currentLang === 'en' ? '📰 *FocusNews - Live Signals:*\n\n' : '📰 *FocusNews - אותות חמים:*\n\n';
+        const dict = getDict();
+        const lines = [dict.shareHeading, ''];
         const summaryText = document.getElementById('ai-summary-text');
         if (summaryText && summaryText.innerText.trim() !== '') {
-            const summaryTitle = currentLang === 'en' ? 'Overview' : 'מבט על';
-            text += `*🌎 ${summaryTitle}:*\n${summaryText.innerText.trim()}\n\n`;
+            lines.push(`${dict.shareOverview}:`);
+            lines.push(summaryText.innerText.trim());
+            lines.push('');
         }
 
         const topSignalCards = document.querySelectorAll('.signal-card h4');
+        const topSignals = [];
         topSignalCards.forEach((card, index) => {
-            if (index < 3) text += `• ${card.innerText.trim()}\n`;
+            if (index < 3 && card.innerText.trim()) topSignals.push(`- ${card.innerText.trim()}`);
         });
+        if (topSignals.length) {
+            lines.push(`${dict.shareTopSignals}:`);
+            lines.push(...topSignals);
+            lines.push('');
+        }
 
-        text += `\n${currentLang === 'en' ? '🔗 Full dashboard:' : '🔗 לדשבורד המלא:'} ${url}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        const timelineEntries = [];
+        document.querySelectorAll('.timeline-item').forEach((item, index) => {
+            if (index >= 3) return;
+            const time = item.querySelector('.timeline-time')?.innerText?.trim();
+            const text = item.querySelector('.timeline-content p')?.innerText?.trim();
+            if (text) timelineEntries.push(`- ${time ? `${time} | ` : ''}${text}`);
+        });
+        if (timelineEntries.length) {
+            lines.push(`${dict.shareTimeline}:`);
+            lines.push(...timelineEntries);
+            lines.push('');
+        }
+
+        lines.push(`${dict.shareOpenApp}: ${url}`);
+        const shareText = sanitizeShareText(lines.join('\n')) || dict.shareNoSummary;
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
     };
 
     document.addEventListener('visibilitychange', () => {
@@ -724,18 +778,21 @@ document.addEventListener('DOMContentLoaded', () => {
     filterSelector.addEventListener('change', () => {
         currentFilter = filterSelector.value;
         localStorage.setItem('filterProfile', currentFilter);
+        updateControlHelp();
         fetchUpdates();
     });
 
     topicSelector.addEventListener('change', () => {
         currentTopic = topicSelector.value;
         localStorage.setItem('topicFilter', currentTopic);
+        updateControlHelp();
         applyViewState();
     });
 
     viewSelector.addEventListener('change', () => {
         currentView = viewSelector.value;
         localStorage.setItem('viewMode', currentView);
+        updateControlHelp();
         applyViewState();
     });
 

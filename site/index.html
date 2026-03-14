@@ -85,6 +85,7 @@
                         <option value="balanced">מאוזן</option>
                         <option value="fast">מהיר</option>
                     </select>
+                    <p id="filter-help" class="control-help"></p>
                 </div>
                 <div class="control-chip-group">
                     <label class="control-label" for="topic-selector">נושא</label>
@@ -95,6 +96,7 @@
                         <option value="economy">כלכלה</option>
                         <option value="general">כללי</option>
                     </select>
+                    <p id="topic-help" class="control-help"></p>
                 </div>
                 <div class="control-chip-group">
                     <label class="control-label" for="view-selector">מצב תצוגה</label>
@@ -103,8 +105,11 @@
                         <option value="all">כל האותות</option>
                         <option value="radar">רדאר מוקדם</option>
                     </select>
+                    <p id="view-help" class="control-help"></p>
                 </div>
             </section>
+
+            <div id="control-state-summary" class="control-state-summary"></div>
         </header>
 
         <main id="dashboard-content" class="dashboard-grid">
