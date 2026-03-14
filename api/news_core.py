@@ -185,9 +185,9 @@ SOURCE_CATALOG = [
 SOURCE_INDEX = {source["id"]: source for source in SOURCE_CATALOG}
 
 FILTER_PROFILES = {
-    "high": {"threshold": 1.12, "max_candidates": 14, "label_he": "אמינות גבוהה", "label_en": "High Trust"},
-    "balanced": {"threshold": 0.84, "max_candidates": 18, "label_he": "מאוזן", "label_en": "Balanced"},
-    "fast": {"threshold": 0.54, "max_candidates": 24, "label_he": "מהיר", "label_en": "Fast"},
+    "high": {"threshold": 0.0, "max_candidates": 24, "label_he": "מלא", "label_en": "Full"},
+    "balanced": {"threshold": 0.0, "max_candidates": 28, "label_he": "מורחב", "label_en": "Expanded"},
+    "fast": {"threshold": 0.0, "max_candidates": 32, "label_he": "חי", "label_en": "Live"},
 }
 
 NOISE_PATTERNS = [
@@ -330,9 +330,9 @@ def fetch_telegram_messages(source: Dict) -> List[Dict]:
 
 def is_noise(text: str) -> bool:
     normalized = normalize_text(text)
-    if len(normalized) < 35:
+    if len(normalized) < 18:
         return True
-    if len(tokenize(normalized)) < 6:
+    if len(tokenize(normalized)) < 3:
         return True
     return any(pattern in normalized for pattern in NOISE_PATTERNS)
 
@@ -347,9 +347,9 @@ def score_message(message: Dict) -> Optional[Dict]:
     normalized = normalize_text(text)
     tokens = tokenize(text)
     keyword_hits = sum(1 for words in EVENT_KEYWORDS.values() for word in words if word.lower() in normalized)
-    length_bonus = min(len(tokens) / 35, 0.24)
-    source_weight = (source["trust_score"] * 0.55) + (source["priority"] * 0.25)
-    signal_bonus = min(keyword_hits * 0.08, 0.32)
+    length_bonus = min(len(tokens) / 28, 0.34)
+    source_weight = 0.45 + (source["priority"] * 0.3)
+    signal_bonus = min(keyword_hits * 0.09, 0.42)
 
     time_str = message.get("time") or ""
     freshness_bonus = 0.0
@@ -494,10 +494,11 @@ Review the scored candidate clusters from the last hour and produce bilingual JS
 
 Rules:
 - Use only information that appears in the candidate clusters below.
-- Prefer clusters with higher confidence and verified multi-source support.
-- Keep a strict distinction between confirmed, developing, and single-source events.
+- Prefer broad coverage of the hour, not just the most heavily repeated events.
+- Merge duplicates, but keep distinct developments separate so the feed feels full and useful.
 - Preserve exact HH:MM timestamps only when present in the raw reports.
-- Create 3-5 top signals with a short 'why_it_matters' line.
+- Create 4-6 top signals with a short 'why_it_matters' line.
+- Build 10-18 timeline events when the hour is busy, and 6-10 when it is quieter.
 - Every category item and timeline event must include:
   source, matched_sources, confidence, verification_status, level.
 

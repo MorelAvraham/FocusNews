@@ -19,14 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshBtn = document.getElementById('refresh-btn');
     const refreshIcon = document.getElementById('refresh-icon');
     const copySummaryBtn = document.getElementById('copy-summary-btn');
-    const filterSelector = document.getElementById('filter-selector');
-    const topicSelector = document.getElementById('topic-selector');
-    const viewSelector = document.getElementById('view-selector');
 
     let currentLang = localStorage.getItem('lang') || 'he';
-    let currentFilter = localStorage.getItem('filterProfile') || 'high';
-    let currentTopic = localStorage.getItem('topicFilter') || 'all';
-    let currentView = localStorage.getItem('viewMode') || 'verified';
     let lastFetchTime = null;
     let loadingPhaseInterval = null;
     let currentData = null;
@@ -38,36 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
         critical: '🚨',
         notable: '🟠',
         info: '🔹'
-    };
-
-    const topicKeyMap = {
-        he: {
-            'ביטחון': 'security',
-            'פוליטיקה': 'politics',
-            'כלכלה': 'economy',
-            'כללי': 'general'
-        },
-        en: {
-            'Security': 'security',
-            'Politics': 'politics',
-            'Economy': 'economy',
-            'General': 'general'
-        }
-    };
-
-    const topicLabelMap = () => ({
-        all: getDict().topicAll,
-        security: getDict().topicSecurity,
-        politics: getDict().topicPolitics,
-        economy: getDict().topicEconomy,
-        general: getDict().topicGeneral
-    });
-
-    const verificationText = (status) => {
-        const dict = getDict();
-        if (status === 'confirmed') return dict.verifiedConfirmed;
-        if (status === 'developing') return dict.verifiedDeveloping;
-        return dict.verifiedSingle;
     };
 
     const sourceNameForItem = (item) => item.source_label || item.source || '';
@@ -132,9 +96,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('summary-title').innerText = dict.summaryTitle;
         document.getElementById('top-signals-title').innerText = dict.topSignalsTitle;
         document.getElementById('source-pulse-title').innerText = dict.sourcePulseTitle;
-        document.querySelector('label[for="filter-selector"]').innerText = dict.filterLabel;
-        document.querySelector('label[for="topic-selector"]').innerText = dict.topicLabel;
-        document.querySelector('label[for="view-selector"]').innerText = dict.viewLabel;
         document.getElementById('live-label').innerText = dict.liveLabel;
         document.getElementById('viewers-label').innerText = dict.viewsLabel;
 
@@ -149,22 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingDescEl = document.getElementById('loading-desc');
         if (loadingDescEl) loadingDescEl.innerText = dict.loadingDesc;
 
-        filterSelector.options[0].text = dict.filterHigh;
-        filterSelector.options[1].text = dict.filterBalanced;
-        filterSelector.options[2].text = dict.filterFast;
-
-        topicSelector.options[0].text = dict.topicAll;
-        topicSelector.options[1].text = dict.topicSecurity;
-        topicSelector.options[2].text = dict.topicPolitics;
-        topicSelector.options[3].text = dict.topicEconomy;
-        topicSelector.options[4].text = dict.topicGeneral;
-
-        viewSelector.options[0].text = dict.viewVerified;
-        viewSelector.options[1].text = dict.viewAll;
-        viewSelector.options[2].text = dict.viewRadar;
-
         langText.innerText = dict.langName;
-        updateControlHelp();
         updateHistoryDropdown();
         updateFreshnessDot();
 
@@ -173,36 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentData) {
             applyViewState();
-        }
-    };
-
-    const updateControlHelp = () => {
-        const dict = getDict();
-        const filterHelp = document.getElementById('filter-help');
-        const topicHelp = document.getElementById('topic-help');
-        const viewHelp = document.getElementById('view-help');
-        const summary = document.getElementById('control-state-summary');
-
-        const filterHelpText = {
-            high: dict.filterHighHelp,
-            balanced: dict.filterBalancedHelp,
-            fast: dict.filterFastHelp
-        };
-
-        const viewHelpText = {
-            verified: dict.viewVerifiedHelp,
-            all: dict.viewAllHelp,
-            radar: dict.viewRadarHelp
-        };
-
-        if (filterHelp) filterHelp.innerText = filterHelpText[currentFilter] || dict.filterHighHelp;
-        if (topicHelp) topicHelp.innerText = dict.topicHelp;
-        if (viewHelp) viewHelp.innerText = viewHelpText[currentView] || dict.viewVerifiedHelp;
-        if (summary) {
-            summary.innerText = dict.controlStateSummary
-                .replace('{filter}', filterSelector.options[filterSelector.selectedIndex].text)
-                .replace('{topic}', topicSelector.options[topicSelector.selectedIndex].text)
-                .replace('{view}', viewSelector.options[viewSelector.selectedIndex].text);
         }
     };
 
@@ -226,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const buildEndpoint = () => {
         const historySelector = document.getElementById('history-selector');
         const hoursAgo = historySelector ? historySelector.value : '0';
-        const params = new URLSearchParams({ lang: currentLang, filter: currentFilter });
+        const params = new URLSearchParams({ lang: currentLang });
         if (hoursAgo !== '0') {
             params.set('hours_ago', hoursAgo);
             return `/api/history?${params.toString()}`;
@@ -323,58 +239,11 @@ document.addEventListener('DOMContentLoaded', () => {
         errorMessage.innerText = msg;
     };
 
-    const topicKeyForName = (name) => {
-        const map = topicKeyMap[currentLang] || {};
-        return map[name] || 'general';
-    };
-
-    const matchesView = (item) => {
-        if (currentView === 'all') return true;
-        if (currentView === 'radar') return item.verification_status !== 'confirmed';
-        return item.verification_status === 'confirmed' || item.confidence >= 0.75;
-    };
-
-    const matchesTopic = (topicValue) => currentTopic === 'all' || currentTopic === topicValue;
-
-    const filterCategories = (categories = []) => {
-        return categories
-            .map((category) => {
-                const topicKey = topicKeyForName(category.name);
-                const items = (category.items || []).filter((item) => matchesTopic(topicKey) && matchesView(item));
-                return { ...category, items, topicKey };
-            })
-            .filter((category) => currentTopic === 'all' || category.topicKey === currentTopic);
-    };
-
-    const filterTimeline = (timelineItems = []) => {
-        return timelineItems.filter((item) => {
-            const topicKey = item.topic ? item.topic : inferTopicFromTimeline(item);
-            return matchesTopic(topicKey) && matchesView(item);
-        });
-    };
-
-    const inferTopicFromTimeline = (item) => {
-        const text = `${item.event || ''} ${item.why_it_matters || ''}`.toLowerCase();
-        if (text.includes('קבינט') || text.includes('minister') || text.includes('ceasefire')) return 'politics';
-        if (text.includes('market') || text.includes('econom')) return 'economy';
-        return 'security';
-    };
-
-    const filteredSignals = (signals = []) => {
-        return signals.filter((signal) => {
-            const topicKey = topicKeyForName(signal.topic);
-            return matchesTopic(topicKey) && matchesView(signal);
-        });
-    };
-
     const badgeHtml = (item) => {
-        const confidencePct = Math.round((item.confidence || 0) * 100);
         const sourcesCount = sourceNamesForItem(item).length;
         return `
             <div class="meta-badges">
-                <span class="meta-badge meta-badge-verify">${verificationText(item.verification_status)}</span>
-                <span class="meta-badge meta-badge-confidence">${getDict().confidenceLabel} ${confidencePct}%</span>
-                <span class="meta-badge meta-badge-sources">${sourcesCount} src</span>
+                ${sourcesCount ? `<span class="meta-badge meta-badge-sources">${sourcesCount} ${currentLang === 'he' ? 'מקורות' : 'sources'}</span>` : ''}
             </div>
         `;
     };
@@ -397,9 +266,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <h4>${signal.title || ''}</h4>
                 <p>${signal.why_it_matters || ''}</p>
-                <div class="meta-badges">
-                    <span class="meta-badge meta-badge-verify">${verificationText(signal.verification_status)}</span>
-                </div>
                 <div class="signal-sources">${sourceList}</div>
             `;
             topSignalsContainer.appendChild(card);
@@ -545,10 +411,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFreshnessDot();
 
         renderSummary(data);
-        renderTopSignals(filteredSignals(data.top_signals || []));
+        renderTopSignals(data.top_signals || []);
         renderSourcePulse(data.sources_summary || {}, data.source_catalog || []);
-        renderCategories(filterCategories(data.categories || []));
-        renderTimeline(filterTimeline(data.timeline || []));
+        renderCategories(data.categories || []);
+        renderTimeline(data.timeline || []);
     };
 
     const applyViewState = () => {
@@ -769,31 +635,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isPulling) return;
         if (touchEndY > touchStartY + 150) fetchUpdates();
         isPulling = false;
-    });
-
-    filterSelector.value = currentFilter;
-    topicSelector.value = currentTopic;
-    viewSelector.value = currentView;
-
-    filterSelector.addEventListener('change', () => {
-        currentFilter = filterSelector.value;
-        localStorage.setItem('filterProfile', currentFilter);
-        updateControlHelp();
-        fetchUpdates();
-    });
-
-    topicSelector.addEventListener('change', () => {
-        currentTopic = topicSelector.value;
-        localStorage.setItem('topicFilter', currentTopic);
-        updateControlHelp();
-        applyViewState();
-    });
-
-    viewSelector.addEventListener('change', () => {
-        currentView = viewSelector.value;
-        localStorage.setItem('viewMode', currentView);
-        updateControlHelp();
-        applyViewState();
     });
 
     if (shareWhatsappBtn) shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
