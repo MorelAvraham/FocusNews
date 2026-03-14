@@ -5,7 +5,10 @@ from datetime import datetime, timedelta, timezone
 
 import redis
 
-from news_core import summarize_updates
+try:
+    from api.news_core import summarize_updates
+except ImportError:
+    from news_core import summarize_updates
 
 
 GEN_TZ = timezone(timedelta(hours=2))

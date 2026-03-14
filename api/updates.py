@@ -6,7 +6,10 @@ from urllib.parse import parse_qs, urlparse
 
 import redis
 
-from news_core import build_fallback_payload, summarize_updates
+try:
+    from api.news_core import build_fallback_payload, summarize_updates
+except ImportError:
+    from news_core import build_fallback_payload, summarize_updates
 
 
 GEN_TZ = timezone(timedelta(hours=2))

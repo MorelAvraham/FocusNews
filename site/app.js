@@ -202,11 +202,24 @@ document.addEventListener('DOMContentLoaded', () => {
         return `/api/updates?${params.toString()}`;
     };
 
+    const parseApiResponse = async (res) => {
+        const text = await res.text();
+        try {
+            const data = text ? JSON.parse(text) : {};
+            return { data, rawText: text };
+        } catch (error) {
+            const cleaned = (text || '').replace(/\s+/g, ' ').trim();
+            const excerpt = cleaned.slice(0, 180);
+            const message = excerpt || `Server Error (${res.status})`;
+            throw new Error(message);
+        }
+    };
+
     const fetchUpdates = async () => {
         try {
             showLoading();
             const res = await fetch(buildEndpoint());
-            const data = await res.json();
+            const { data } = await parseApiResponse(res);
 
             if (!res.ok && !data.stale) {
                 throw new Error(data.error || `Server Error (${res.status})`);
