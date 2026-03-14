@@ -655,7 +655,18 @@ def build_sources_summary(raw_messages: List[Dict], selected_clusters: List[Dict
     }
 
 
-def normalize_item_metadata(item: Dict, lang: str) -> Dict:
+def find_fallback_time(item: Dict, raw_messages: List[Dict]) -> str:
+    candidate_sources = item.get("matched_sources") or ([item["source"]] if item.get("source") else [])
+    for source_id in candidate_sources:
+        for message in raw_messages:
+            if message.get("channel") == source_id:
+                fallback = format_time_hm(message.get("time", ""))
+                if fallback:
+                    return fallback
+    return ""
+
+
+def normalize_item_metadata(item: Dict, lang: str, raw_messages: Optional[List[Dict]] = None) -> Dict:
     level = item.get("level") or "info"
     verification_status = item.get("verification_status") or "single_source"
     matched_sources = item.get("matched_sources") or ([item["source"]] if item.get("source") else [])
@@ -668,13 +679,15 @@ def normalize_item_metadata(item: Dict, lang: str) -> Dict:
     normalized["verification_status"] = verification_status
     normalized["matched_sources"] = matched_sources
     normalized["confidence"] = round(float(confidence), 2)
+    if not normalized.get("time") and raw_messages is not None:
+        normalized["time"] = find_fallback_time(normalized, raw_messages)
     if normalized.get("source"):
         normalized["source_label"] = source_display_name(normalized["source"], lang)
     normalized["matched_source_labels"] = [source_display_name(source_id, lang) for source_id in matched_sources]
     return normalized
 
 
-def ensure_category_items(data: Dict, lang: str) -> None:
+def ensure_category_items(data: Dict, lang: str, selected_clusters: List[Dict]) -> None:
     categories = data.get("categories") or []
     normalized_categories = []
     for category in categories:
@@ -685,12 +698,60 @@ def ensure_category_items(data: Dict, lang: str) -> None:
                 item = {"text": item, "source": ""}
             normalized_items.append(normalize_item_metadata(item, lang))
         normalized_categories.append({"name": category.get("name", TOPIC_TO_CATEGORY["general"][lang]), "items": normalized_items})
+
+    total_items = sum(len(category["items"]) for category in normalized_categories)
+    if total_items < 10:
+        category_map = {category["name"]: category for category in normalized_categories}
+        for cluster in selected_clusters[:12]:
+            category_name = TOPIC_TO_CATEGORY.get(cluster["topic"], TOPIC_TO_CATEGORY["general"])[lang]
+            category = category_map.setdefault(category_name, {"name": category_name, "items": []})
+            candidate_text = cluster["primary"]["text"][:160]
+            if any(item.get("text") == candidate_text for item in category["items"]):
+                continue
+            category["items"].append(
+                normalize_item_metadata(
+                    {
+                        "text": candidate_text,
+                        "source": cluster["primary"]["channel"],
+                        "matched_sources": cluster["matched_sources"],
+                        "confidence": cluster["confidence"],
+                        "verification_status": cluster["verification_status"],
+                        "level": "notable",
+                    },
+                    lang,
+                )
+            )
+        normalized_categories = list(category_map.values())
     data["categories"] = normalized_categories
 
 
-def ensure_timeline(data: Dict, lang: str) -> None:
+def ensure_timeline(data: Dict, lang: str, raw_messages: List[Dict], selected_clusters: List[Dict]) -> None:
     timeline = data.get("timeline") or []
-    data["timeline"] = [normalize_item_metadata(item, lang) for item in timeline]
+    normalized_timeline = [normalize_item_metadata(item, lang, raw_messages) for item in timeline]
+    if len(normalized_timeline) < 8:
+        existing_events = {item.get("event") for item in normalized_timeline}
+        for cluster in selected_clusters[:14]:
+            primary = cluster["primary"]
+            event_text = primary["text"][:170]
+            if event_text in existing_events:
+                continue
+            normalized_timeline.append(
+                normalize_item_metadata(
+                    {
+                        "time": format_time_hm(primary.get("time", "")),
+                        "source": primary["channel"],
+                        "matched_sources": cluster["matched_sources"],
+                        "event": event_text,
+                        "level": "critical" if cluster["topic"] == "security" and cluster["score"] > 1.1 else "notable",
+                        "confidence": cluster["confidence"],
+                        "verification_status": cluster["verification_status"],
+                        "why_it_matters": cluster["why_it_matters"],
+                    },
+                    lang,
+                    raw_messages,
+                )
+            )
+    data["timeline"] = normalized_timeline[:18]
 
 
 def ensure_top_signals(data: Dict, lang: str, selected_clusters: List[Dict]) -> None:
@@ -768,8 +829,8 @@ def minimal_source_catalog(lang: str) -> List[Dict]:
 
 
 def attach_metadata_to_payload(data: Dict, lang: str, filter_name: str, raw_messages: List[Dict], selected_clusters: List[Dict]) -> Dict:
-    ensure_category_items(data, lang)
-    ensure_timeline(data, lang)
+    ensure_category_items(data, lang, selected_clusters)
+    ensure_timeline(data, lang, raw_messages, selected_clusters)
     ensure_top_signals(data, lang, selected_clusters)
     data["filter_profile"] = filter_name
     data["sources_summary"] = build_sources_summary(raw_messages, selected_clusters, lang)

@@ -7,8 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const categoriesContainer = document.getElementById('categories-container');
     const timeline = document.getElementById('timeline');
     const topSignalsContainer = document.getElementById('top-signals-container');
-    const sourcePulseSummary = document.getElementById('source-pulse-summary');
-    const sourcePulseTags = document.getElementById('source-pulse-tags');
     const monitoredSourcesTags = document.getElementById('monitored-sources-tags');
     const shareWhatsappBtn = document.getElementById('share-whatsapp-btn');
     const themeToggle = document.getElementById('theme-toggle');
@@ -95,12 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.timeline-section h3').innerHTML = `<i class="icon">⏱️</i> ${dict.timelineTitle.replace('⏱️ ', '')}`;
         document.getElementById('summary-title').innerText = dict.summaryTitle;
         document.getElementById('top-signals-title').innerText = dict.topSignalsTitle;
-        document.getElementById('source-pulse-title').innerText = dict.sourcePulseTitle;
         document.getElementById('live-label').innerText = dict.liveLabel;
         document.getElementById('viewers-label').innerText = dict.viewsLabel;
-
-        const refreshLabel = document.getElementById('refresh-label');
-        if (refreshLabel) refreshLabel.innerText = dict.refreshBtn;
         const copyLabel = document.getElementById('copy-label');
         if (copyLabel) copyLabel.innerText = dict.copyBtn;
         const retryLabel = document.getElementById('retry-label');
@@ -272,25 +266,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const renderSourcePulse = (summary = { active_count: 0, contributing_count: 0, enabled_count: 0, sources: [] }, sourceCatalog = []) => {
-        sourcePulseSummary.innerText = getDict().sourcesPulseSummary
-            .replace('{active}', summary.active_count || 0)
-            .replace('{contributing}', summary.contributing_count || 0)
-            .replace('{enabled}', summary.enabled_count || 0);
-
-        sourcePulseTags.innerHTML = '';
+    const renderSourceCatalog = (summary = { active_count: 0, enabled_count: 0, sources: [] }, sourceCatalog = []) => {
         monitoredSourcesTags.innerHTML = '';
         const titleEl = document.getElementById('monitored-sources-title');
         titleEl.innerHTML = `${getDict().sourcesTitle.split('<span>')[0]} <span>(${summary.active_count || 0}/${summary.enabled_count || 0} ${currentLang === 'he' ? 'פעילים' : 'active'})</span>`;
 
         const activeSources = summary.sources || [];
-        activeSources.forEach((source) => {
-            const pulse = document.createElement('span');
-            pulse.className = `source-pulse-chip ${source.contributed ? 'contributed' : ''}`;
-            pulse.innerHTML = `${source.name} <small>${source.raw_count}</small>`;
-            sourcePulseTags.appendChild(pulse);
-        });
-
         const contributionMap = Object.fromEntries(activeSources.map((source) => [source.id, source]));
         sourceCatalog.forEach((source) => {
             const sourceState = contributionMap[source.id];
@@ -412,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderSummary(data);
         renderTopSignals(data.top_signals || []);
-        renderSourcePulse(data.sources_summary || {}, data.source_catalog || []);
+        renderSourceCatalog(data.sources_summary || {}, data.source_catalog || []);
         renderCategories(data.categories || []);
         renderTimeline(data.timeline || []);
     };
@@ -638,7 +619,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (shareWhatsappBtn) shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
-    if (refreshBtn) refreshBtn.addEventListener('click', fetchUpdates);
     if (copySummaryBtn) copySummaryBtn.addEventListener('click', copySummary);
 
     const retryBtn = document.getElementById('retry-btn');
