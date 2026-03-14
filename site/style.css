@@ -239,6 +239,28 @@ h2 {
     font-size: 0.95rem;
 }
 
+.signal-control-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 1.4rem;
+}
+
+.control-chip-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: start;
+}
+
+.control-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
 /* Removed Status Badge Styles */
 
 /* Status Bar & Refresh */
@@ -281,6 +303,85 @@ h2 {
     flex-direction: column;
     gap: 2.5rem;
     /* זה הרווח בין כל הבלוקים */
+}
+
+.wow-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 0.9fr;
+    gap: 1.5rem;
+}
+
+.signal-panel h3 {
+    margin-bottom: 1rem;
+}
+
+.signal-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.signal-card {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.08), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    border-radius: 16px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.signal-card.empty-state {
+    grid-column: 1 / -1;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    min-height: 140px;
+}
+
+.signal-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.signal-topic-pill,
+.signal-confidence {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.signal-topic-pill {
+    background: rgba(0, 212, 255, 0.12);
+    color: var(--accent-blue);
+}
+
+.signal-confidence {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--accent-green);
+}
+
+.signal-card h4 {
+    font-size: 1.05rem;
+    line-height: 1.35;
+}
+
+.signal-card p,
+.signal-sources {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.pulse-summary {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
 }
 
 .grid-layout {
@@ -342,6 +443,53 @@ section h3 {
     border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
+.item-source-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.item-source-secondary {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.meta-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.meta-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-weight: 700;
+    border: 1px solid transparent;
+}
+
+.meta-badge-verify {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.2);
+    color: var(--accent-blue);
+}
+
+.meta-badge-confidence {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: var(--accent-green);
+}
+
+.meta-badge-sources {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.2);
+    color: var(--accent-orange);
+}
+
 /* Timeline */
 .timeline-container {
     position: relative;
@@ -397,6 +545,14 @@ section h3 {
     gap: 5px;
 }
 
+.timeline-topline {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
 .timeline-source {
     font-size: 0.8rem;
     color: var(--accent-orange);
@@ -406,6 +562,11 @@ section h3 {
 
 .timeline-content p {
     font-size: 0.95rem;
+}
+
+.why-it-matters {
+    color: var(--text-secondary);
+    font-size: 0.84rem;
 }
 
 /* Utilities */
@@ -578,6 +739,33 @@ section h3 {
     font-size: 0.8rem;
     color: var(--text-secondary);
     border: 1px solid var(--card-border-glass);
+}
+
+.source-tags small {
+    color: inherit;
+    opacity: 0.75;
+}
+
+.source-pulse-tags,
+#monitored-sources-tags {
+    justify-content: center;
+}
+
+.source-pulse-chip,
+.source-catalog-chip {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    border: 1px solid var(--card-border-glass);
+}
+
+.source-pulse-chip.contributed,
+.source-catalog-chip.contributed {
+    color: var(--text-primary);
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.1);
 }
 
 .footer-bottom {
@@ -776,6 +964,10 @@ section h3 {
     .grid-layout {
         grid-template-columns: repeat(2, 1fr);
     }
+
+    .wow-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 900px) {
@@ -797,6 +989,14 @@ section h3 {
     .header-top-bar {
         flex-direction: column;
         gap: 15px;
+    }
+
+    .signal-control-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .signal-cards-grid {
+        grid-template-columns: 1fr;
     }
 
     .top-bar-controls {
@@ -843,6 +1043,11 @@ section h3 {
         margin: 0 5px;
         padding: 10px 0;
         font-size: 0.95rem;
+    }
+
+    .timeline-topline {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
 

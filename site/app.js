@@ -1,52 +1,85 @@
 document.addEventListener('DOMContentLoaded', () => {
     const lastUpdatedEl = document.getElementById('last-updated');
-
     const loadingState = document.getElementById('loading-state');
     const errorState = document.getElementById('error-state');
     const errorMessage = document.getElementById('error-message');
     const dashboardData = document.getElementById('dashboard-data');
-
     const categoriesContainer = document.getElementById('categories-container');
     const timeline = document.getElementById('timeline');
-
+    const topSignalsContainer = document.getElementById('top-signals-container');
+    const sourcePulseSummary = document.getElementById('source-pulse-summary');
+    const sourcePulseTags = document.getElementById('source-pulse-tags');
+    const monitoredSourcesTags = document.getElementById('monitored-sources-tags');
     const shareWhatsappBtn = document.getElementById('share-whatsapp-btn');
     const themeToggle = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-icon');
     const themeText = document.getElementById('theme-text');
-
     const langToggle = document.getElementById('lang-toggle');
-    const langIcon = document.getElementById('lang-icon');
     const langText = document.getElementById('lang-text');
-
     const refreshBtn = document.getElementById('refresh-btn');
     const refreshIcon = document.getElementById('refresh-icon');
     const copySummaryBtn = document.getElementById('copy-summary-btn');
-
-    // Module-scope state
-    let lastFetchTime = null;
-    let loadingPhaseInterval = null;
-
-    // i18n Dictionary is now sourced from translations.js
+    const filterSelector = document.getElementById('filter-selector');
+    const topicSelector = document.getElementById('topic-selector');
+    const viewSelector = document.getElementById('view-selector');
 
     let currentLang = localStorage.getItem('lang') || 'he';
+    let currentFilter = localStorage.getItem('filterProfile') || 'high';
+    let currentTopic = localStorage.getItem('topicFilter') || 'all';
+    let currentView = localStorage.getItem('viewMode') || 'verified';
+    let lastFetchTime = null;
+    let loadingPhaseInterval = null;
+    let currentData = null;
 
-    // Display mappings for nice Hebrew names
-    const channelMap = {
-        'abualiexpress': 'אבו עלי אקספרס',
-        'amitsegal': 'עמית סגל',
-        'miraedj': 'מבזק אפל',
-        'ziv710': 'זיו רובינשטיין',
-        'salehdesk1': 'סאלח (הדסק הערבי)',
-        'arabworld301news': 'עולם הערבים 301',
-        'GLOBAL_Telegram_MOKED': 'מוקד טלגרם עולמי',
-        'New_security8200': 'מודיעין 8200'
+    const getDict = () => i18n[currentLang];
+
+    const levelIconMap = {
+        critical: '🚨',
+        notable: '🟠',
+        info: '🔹'
     };
 
-    // ── Helper: animate number count-up ──
+    const topicKeyMap = {
+        he: {
+            'ביטחון': 'security',
+            'פוליטיקה': 'politics',
+            'כלכלה': 'economy',
+            'כללי': 'general'
+        },
+        en: {
+            'Security': 'security',
+            'Politics': 'politics',
+            'Economy': 'economy',
+            'General': 'general'
+        }
+    };
+
+    const topicLabelMap = () => ({
+        all: getDict().topicAll,
+        security: getDict().topicSecurity,
+        politics: getDict().topicPolitics,
+        economy: getDict().topicEconomy,
+        general: getDict().topicGeneral
+    });
+
+    const verificationText = (status) => {
+        const dict = getDict();
+        if (status === 'confirmed') return dict.verifiedConfirmed;
+        if (status === 'developing') return dict.verifiedDeveloping;
+        return dict.verifiedSingle;
+    };
+
+    const sourceNameForItem = (item) => item.source_label || item.source || '';
+    const sourceNamesForItem = (item) => item.matched_source_labels || item.matched_sources || [];
+
     const animateCountUp = (el, target, duration = 600) => {
-        const start = parseInt(el.textContent) || 0;
+        if (!el) return;
+        const start = parseInt(el.textContent, 10) || 0;
         const range = target - start;
-        if (range === 0 || isNaN(target)) { el.textContent = target; return; }
+        if (range === 0 || Number.isNaN(target)) {
+            el.textContent = target;
+            return;
+        }
         const startTime = performance.now();
         const step = (currentTime) => {
             const elapsed = currentTime - startTime;
@@ -58,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(step);
     };
 
-    // ── Helper: set refresh button loading state ──
     const setRefreshLoading = (isLoading) => {
         if (!refreshBtn) return;
         refreshBtn.disabled = isLoading;
@@ -67,7 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // ── Freshness dot ──
     const updateFreshnessDot = () => {
         const dot = document.getElementById('freshness-dot');
         if (!dot || !lastFetchTime) return;
@@ -86,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const updateUIText = () => {
-        const dict = i18n[currentLang];
+        const dict = getDict();
         document.documentElement.dir = currentLang === 'he' ? 'rtl' : 'ltr';
         document.documentElement.lang = currentLang;
 
@@ -95,15 +126,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('#loading-state h3').innerText = dict.loadingTitle;
         document.querySelector('#loading-state p').innerText = dict.loadingDesc;
         document.querySelector('#error-state h3').innerText = dict.errorTitle;
-        const whatsappText = document.getElementById('whatsapp-text');
-        if (whatsappText) whatsappText.innerText = dict.shareBtn;
+        document.getElementById('whatsapp-text').innerText = dict.shareBtn;
         document.querySelector('.timeline-section h3').innerHTML = `<i class="icon">⏱️</i> ${dict.timelineTitle.replace('⏱️ ', '')}`;
-        document.getElementById('monitored-sources-title').innerHTML = dict.sourcesTitle;
-
-        langText.innerText = dict.langName;
+        document.getElementById('summary-title').innerText = dict.summaryTitle;
+        document.getElementById('top-signals-title').innerText = dict.topSignalsTitle;
+        document.getElementById('source-pulse-title').innerText = dict.sourcePulseTitle;
+        document.querySelector('label[for="filter-selector"]').innerText = dict.filterLabel;
+        document.querySelector('label[for="topic-selector"]').innerText = dict.topicLabel;
+        document.querySelector('label[for="view-selector"]').innerText = dict.viewLabel;
         document.getElementById('live-label').innerText = dict.liveLabel;
         document.getElementById('viewers-label').innerText = dict.viewsLabel;
-        document.getElementById('summary-title').innerText = dict.summaryTitle;
 
         const refreshLabel = document.getElementById('refresh-label');
         if (refreshLabel) refreshLabel.innerText = dict.refreshBtn;
@@ -116,89 +148,90 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingDescEl = document.getElementById('loading-desc');
         if (loadingDescEl) loadingDescEl.innerText = dict.loadingDesc;
 
+        filterSelector.options[0].text = dict.filterHigh;
+        filterSelector.options[1].text = dict.filterBalanced;
+        filterSelector.options[2].text = dict.filterFast;
+
+        topicSelector.options[0].text = dict.topicAll;
+        topicSelector.options[1].text = dict.topicSecurity;
+        topicSelector.options[2].text = dict.topicPolitics;
+        topicSelector.options[3].text = dict.topicEconomy;
+        topicSelector.options[4].text = dict.topicGeneral;
+
+        viewSelector.options[0].text = dict.viewVerified;
+        viewSelector.options[1].text = dict.viewAll;
+        viewSelector.options[2].text = dict.viewRadar;
+
+        langText.innerText = dict.langName;
         updateHistoryDropdown();
         updateFreshnessDot();
 
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         themeText.innerText = isDark ? dict.themeLight : dict.themeDark;
+
+        if (currentData) {
+            applyViewState();
+        }
     };
 
     const updateHistoryDropdown = () => {
-        const dict = i18n[currentLang];
+        const dict = getDict();
         const historySelector = document.getElementById('history-selector');
         if (!historySelector) return;
-
-        const prevVal = historySelector.value || "0";
+        const prevVal = historySelector.value || '0';
         historySelector.innerHTML = '';
-
         for (let i = 0; i <= 24; i++) {
             const option = document.createElement('option');
             option.value = i;
-            if (i === 0) {
-                option.text = dict.historyNow;
-            } else if (i === 1) {
-                option.text = dict.historyHourAgo;
-            } else {
-                option.text = dict.historyHoursAgo.replace('{h}', i);
-            }
+            if (i === 0) option.text = dict.historyNow;
+            else if (i === 1) option.text = dict.historyHourAgo;
+            else option.text = dict.historyHoursAgo.replace('{h}', i);
             historySelector.appendChild(option);
         }
         historySelector.value = prevVal;
     };
 
+    const buildEndpoint = () => {
+        const historySelector = document.getElementById('history-selector');
+        const hoursAgo = historySelector ? historySelector.value : '0';
+        const params = new URLSearchParams({ lang: currentLang, filter: currentFilter });
+        if (hoursAgo !== '0') {
+            params.set('hours_ago', hoursAgo);
+            return `/api/history?${params.toString()}`;
+        }
+        return `/api/updates?${params.toString()}`;
+    };
+
     const fetchUpdates = async () => {
         try {
             showLoading();
-
-            const historySelector = document.getElementById('history-selector');
-            const hoursAgo = historySelector ? historySelector.value : "0";
-
-            let endpoint = `/api/updates?lang=${currentLang}`;
-            if (hoursAgo !== "0") {
-                endpoint = `/api/history?lang=${currentLang}&hours_ago=${hoursAgo}`;
-            }
-
-            const res = await fetch(endpoint);
-
-            if (!res.ok) {
-                let errText = await res.text();
-                throw new Error(`Server Error (${res.status}): ${errText}`);
-            }
+            const res = await fetch(buildEndpoint());
             const data = await res.json();
 
-            if (data.error) {
-                throw new Error(data.error);
+            if (!res.ok && !data.stale) {
+                throw new Error(data.error || `Server Error (${res.status})`);
             }
 
-            renderDashboard(data);
+            currentData = data;
+            applyViewState();
 
-            let timeString = '';
-            if (data.generated_at) {
-                timeString = data.generated_at;
-            } else {
-                const now = new Date();
-                timeString = now.toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'he-IL', { hour: '2-digit', minute: '2-digit' });
-            }
+            const timeString = data.generated_at || new Date().toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'he-IL', { hour: '2-digit', minute: '2-digit' });
+            lastUpdatedEl.innerText = `${getDict().lastTestedTemplate}${timeString} | ${getDict().autoUpdateNote}`;
 
-            lastUpdatedEl.innerText = `${i18n[currentLang].lastTestedTemplate}${timeString} | ${i18n[currentLang].autoUpdateNote}`;
-
-            // Notification on unseen updates
             if (document.hidden) {
-                document.title = i18n[currentLang].newUpdatesTab;
+                document.title = getDict().newUpdatesTab;
             }
-
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
             showError(error.message);
-            lastUpdatedEl.innerText = i18n[currentLang].serverError;
+            lastUpdatedEl.innerText = getDict().serverError;
         }
     };
 
-    // ── Loading phase cycling ──
     const startLoadingPhases = () => {
         const phaseEl = document.getElementById('loading-phase');
         if (!phaseEl) return;
-        const phases = i18n[currentLang].loadingPhases;
+        const phases = getDict().loadingPhases;
         let i = 0;
         phaseEl.textContent = phases[0];
         loadingPhaseInterval = setInterval(() => {
@@ -208,18 +241,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const stopLoadingPhases = () => {
-        if (loadingPhaseInterval) { clearInterval(loadingPhaseInterval); loadingPhaseInterval = null; }
+        if (loadingPhaseInterval) {
+            clearInterval(loadingPhaseInterval);
+            loadingPhaseInterval = null;
+        }
         const phaseEl = document.getElementById('loading-phase');
         if (phaseEl) phaseEl.textContent = '';
     };
 
-    // ── Stale data banner ──
     const setStaleBanner = (isStale) => {
         const banner = document.getElementById('stale-banner');
         const msg = document.getElementById('stale-msg');
         if (!banner) return;
         if (isStale) {
-            if (msg) msg.textContent = i18n[currentLang].staleBanner;
+            if (msg) msg.textContent = getDict().staleBanner;
             banner.classList.remove('hidden');
         } else {
             banner.classList.add('hidden');
@@ -229,8 +264,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const showLoading = () => {
         setRefreshLoading(true);
         startLoadingPhases();
-        
-        // Show the skeleton loader while keeping dashboard in DOM but hidden
         loadingState.classList.remove('hidden');
         errorState.classList.add('hidden');
         dashboardData.classList.add('hidden');
@@ -239,33 +272,207 @@ document.addEventListener('DOMContentLoaded', () => {
     const showError = (msg) => {
         setRefreshLoading(false);
         stopLoadingPhases();
-        
         loadingState.classList.add('hidden');
         dashboardData.classList.add('hidden');
         errorState.classList.remove('hidden');
         errorMessage.innerText = msg;
     };
 
-    const renderDashboard = (data) => {
-        setRefreshLoading(false);
-        stopLoadingPhases();
-        setStaleBanner(data.stale === true);
-        loadingState.classList.add('hidden');
-        errorState.classList.add('hidden');
+    const topicKeyForName = (name) => {
+        const map = topicKeyMap[currentLang] || {};
+        return map[name] || 'general';
+    };
 
-        // Fade in the dashboard
-        dashboardData.style.opacity = '0';
-        dashboardData.classList.remove('hidden');
-        requestAnimationFrame(() => {
-            dashboardData.style.transition = 'opacity 0.3s ease';
-            dashboardData.style.opacity = '1';
+    const matchesView = (item) => {
+        if (currentView === 'all') return true;
+        if (currentView === 'radar') return item.verification_status !== 'confirmed';
+        return item.verification_status === 'confirmed' || item.confidence >= 0.75;
+    };
+
+    const matchesTopic = (topicValue) => currentTopic === 'all' || currentTopic === topicValue;
+
+    const filterCategories = (categories = []) => {
+        return categories
+            .map((category) => {
+                const topicKey = topicKeyForName(category.name);
+                const items = (category.items || []).filter((item) => matchesTopic(topicKey) && matchesView(item));
+                return { ...category, items, topicKey };
+            })
+            .filter((category) => currentTopic === 'all' || category.topicKey === currentTopic);
+    };
+
+    const filterTimeline = (timelineItems = []) => {
+        return timelineItems.filter((item) => {
+            const topicKey = item.topic ? item.topic : inferTopicFromTimeline(item);
+            return matchesTopic(topicKey) && matchesView(item);
+        });
+    };
+
+    const inferTopicFromTimeline = (item) => {
+        const text = `${item.event || ''} ${item.why_it_matters || ''}`.toLowerCase();
+        if (text.includes('קבינט') || text.includes('minister') || text.includes('ceasefire')) return 'politics';
+        if (text.includes('market') || text.includes('econom')) return 'economy';
+        return 'security';
+    };
+
+    const filteredSignals = (signals = []) => {
+        return signals.filter((signal) => {
+            const topicKey = topicKeyForName(signal.topic);
+            return matchesTopic(topicKey) && matchesView(signal);
+        });
+    };
+
+    const badgeHtml = (item) => {
+        const confidencePct = Math.round((item.confidence || 0) * 100);
+        const sourcesCount = sourceNamesForItem(item).length;
+        return `
+            <div class="meta-badges">
+                <span class="meta-badge meta-badge-verify">${verificationText(item.verification_status)}</span>
+                <span class="meta-badge meta-badge-confidence">${getDict().confidenceLabel} ${confidencePct}%</span>
+                <span class="meta-badge meta-badge-sources">${sourcesCount} src</span>
+            </div>
+        `;
+    };
+
+    const renderTopSignals = (signals) => {
+        topSignalsContainer.innerHTML = '';
+        if (!signals.length) {
+            topSignalsContainer.innerHTML = `<div class="signal-card empty-state">${getDict().noSignals}</div>`;
+            return;
+        }
+        signals.slice(0, 5).forEach((signal, idx) => {
+            const card = document.createElement('article');
+            card.className = 'signal-card animate-in';
+            card.style.animationDelay = `${idx * 70}ms`;
+            const sourceList = (signal.matched_source_labels || []).join(' • ');
+            card.innerHTML = `
+                <div class="signal-card-top">
+                    <span class="signal-topic-pill">${signal.topic}</span>
+                    <span class="signal-confidence">${Math.round((signal.confidence || 0) * 100)}%</span>
+                </div>
+                <h4>${signal.title || ''}</h4>
+                <p>${signal.why_it_matters || ''}</p>
+                <div class="meta-badges">
+                    <span class="meta-badge meta-badge-verify">${verificationText(signal.verification_status)}</span>
+                </div>
+                <div class="signal-sources">${sourceList}</div>
+            `;
+            topSignalsContainer.appendChild(card);
+        });
+    };
+
+    const renderSourcePulse = (summary = { active_count: 0, contributing_count: 0, enabled_count: 0, sources: [] }, sourceCatalog = []) => {
+        sourcePulseSummary.innerText = getDict().sourcesPulseSummary
+            .replace('{active}', summary.active_count || 0)
+            .replace('{contributing}', summary.contributing_count || 0)
+            .replace('{enabled}', summary.enabled_count || 0);
+
+        sourcePulseTags.innerHTML = '';
+        monitoredSourcesTags.innerHTML = '';
+        const titleEl = document.getElementById('monitored-sources-title');
+        titleEl.innerHTML = `${getDict().sourcesTitle.split('<span>')[0]} <span>(${summary.active_count || 0}/${summary.enabled_count || 0} ${currentLang === 'he' ? 'פעילים' : 'active'})</span>`;
+
+        const activeSources = summary.sources || [];
+        activeSources.forEach((source) => {
+            const pulse = document.createElement('span');
+            pulse.className = `source-pulse-chip ${source.contributed ? 'contributed' : ''}`;
+            pulse.innerHTML = `${source.name} <small>${source.raw_count}</small>`;
+            sourcePulseTags.appendChild(pulse);
         });
 
-        // Record fetch time for freshness dot
-        lastFetchTime = Date.now();
-        updateFreshnessDot();
+        const contributionMap = Object.fromEntries(activeSources.map((source) => [source.id, source]));
+        sourceCatalog.forEach((source) => {
+            const sourceState = contributionMap[source.id];
+            const tag = document.createElement('span');
+            tag.className = `source-catalog-chip ${sourceState?.contributed ? 'contributed' : ''}`;
+            tag.innerHTML = `${source.name} <small>${source.trust_score.toFixed(2)}</small>`;
+            monitoredSourcesTags.appendChild(tag);
+        });
+    };
 
-        // AI Summary
+    const renderCategories = (categories) => {
+        categoriesContainer.innerHTML = '';
+        if (!categories.length) {
+            categoriesContainer.innerHTML = `<div class="glass-panel text-center full-width"><p style="color:var(--text-secondary);">${getDict().noCategories}</p></div>`;
+            return;
+        }
+
+        categories.forEach((cat, idx) => {
+            const section = document.createElement('section');
+            section.className = 'glass-panel category-section animate-in';
+            section.style.animationDelay = `${idx * 60}ms`;
+
+            const iconMap = {
+                'ביטחון': '🛡️', 'Security': '🛡️',
+                'פוליטיקה': '🏛️', 'Politics': '🏛️',
+                'כלכלה': '📈', 'Economy': '📈',
+                'כללי': '📰', 'General': '📰'
+            };
+            const itemCount = cat.items ? cat.items.length : 0;
+            const listHtml = itemCount
+                ? cat.items.map((item) => {
+                    const sourceStr = sourceNameForItem(item);
+                    const matchedSources = sourceNamesForItem(item).join(' • ');
+                    return `<li>
+                        <div class="item-content">${item.text || ''}</div>
+                        ${badgeHtml(item)}
+                        <div class="item-source-row">
+                            ${sourceStr ? `<div class="item-source-tag">${sourceStr}</div>` : ''}
+                            ${matchedSources ? `<div class="item-source-secondary">${matchedSources}</div>` : ''}
+                        </div>
+                    </li>`;
+                }).join('')
+                : `<li style="color:var(--text-secondary); border-color:transparent;">${getDict().noEvents}</li>`;
+
+            section.innerHTML = `
+                <h3 class="category-header" title="${getDict().expand}/${getDict().collapse}">
+                    <i class="icon">${iconMap[cat.name] || '📰'}</i> ${cat.name}
+                    ${itemCount ? `<span class="category-count-badge">${itemCount}</span>` : ''}
+                    <span class="category-toggle-icon">▼</span>
+                </h3>
+                <ul class="category-list">${listHtml}</ul>
+            `;
+            categoriesContainer.appendChild(section);
+
+            const header = section.querySelector('.category-header');
+            const list = section.querySelector('.category-list');
+            header.addEventListener('click', () => {
+                header.classList.toggle('collapsed');
+                list.classList.toggle('collapsed');
+            });
+        });
+    };
+
+    const renderTimeline = (timelineItems) => {
+        timeline.innerHTML = '';
+        if (!timelineItems.length) {
+            timeline.innerHTML = `<div class="glass-panel-light" style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">${getDict().noTimeline}</div>`;
+            return;
+        }
+
+        const sortedTimeline = [...timelineItems].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        sortedTimeline.forEach((item, idx) => {
+            const tlItem = document.createElement('div');
+            const level = item.level || 'info';
+            tlItem.className = `timeline-item timeline-level-${level} animate-in`;
+            tlItem.style.animationDelay = `${idx * 50}ms`;
+            tlItem.innerHTML = `
+                <div class="timeline-time">${item.time || ''}</div>
+                <div class="timeline-marker timeline-marker-${level}"></div>
+                <div class="timeline-content glass-panel-light">
+                    <div class="timeline-topline">
+                        <span class="timeline-source">${sourceNameForItem(item) || ''}</span>
+                        ${badgeHtml(item)}
+                    </div>
+                    <p>${levelIconMap[level] || '🔹'} ${item.event || ''}</p>
+                    ${item.why_it_matters ? `<div class="why-it-matters"><strong>${getDict().whyItMatters}:</strong> ${item.why_it_matters}</div>` : ''}
+                </div>
+            `;
+            timeline.appendChild(tlItem);
+        });
+    };
+
+    const renderSummary = (data) => {
         const aiSummaryContainer = document.getElementById('ai-summary-container');
         const aiSummaryText = document.getElementById('ai-summary-text');
         if (data.summary) {
@@ -274,129 +481,36 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             aiSummaryContainer.classList.add('hidden');
         }
-
-        // 1. Categories
-        categoriesContainer.innerHTML = '';
-        if (data.categories && data.categories.length > 0) {
-            data.categories.forEach((cat, idx) => {
-                const section = document.createElement('section');
-                section.className = 'glass-panel category-section animate-in';
-                section.style.animationDelay = `${idx * 60}ms`;
-
-                const iconMap = {
-                    'ביטחון': '🛡️', 'Security': '🛡️',
-                    'פוליטיקה': '🏛️', 'Politics': '🏛️',
-                    'כלכלה': '📈', 'Economy': '📈',
-                    'חינוך': '📚', 'Education': '📚',
-                    'בריאות': '🏥', 'Health': '🏥',
-                    'כללי': '📰', 'General': '📰'
-                };
-                const catIcon = iconMap[cat.name] || '📰';
-
-                let listHtml = '';
-                if (cat.items && cat.items.length > 0) {
-                    cat.items.forEach(item => {
-                        let textStr = "";
-                        let sourceStr = "";
-
-                        if (typeof item === 'string') {
-                            textStr = item;
-                        } else {
-                            textStr = item.text || '';
-                            let baseSource = item.source || '';
-                            sourceStr = channelMap[baseSource] || baseSource;
-                        }
-
-                        let sourceHtml = '';
-                        if (sourceStr) {
-                            sourceHtml = `<div class="item-source-tag">${sourceStr}</div>`;
-                        }
-
-                        listHtml += `<li>
-                            <div class="item-content">${textStr}</div>
-                            ${sourceHtml}
-                        </li>`;
-                    });
-                } else {
-                    listHtml = `<li style="color:var(--text-secondary); border-color:transparent;">${i18n[currentLang].noEvents}</li>`;
-                }
-
-                // Count badge
-                const itemCount = cat.items ? cat.items.length : 0;
-                const countBadge = itemCount > 0
-                    ? `<span class="category-count-badge">${itemCount}</span>`
-                    : '';
-
-                section.innerHTML = `
-                    <h3 class="category-header" title="${i18n[currentLang].expand}/${i18n[currentLang].collapse}">
-                        <i class="icon">${catIcon}</i> ${cat.name} ${countBadge}
-                        <span class="category-toggle-icon">▼</span>
-                    </h3>
-                    <ul class="category-list">${listHtml}</ul>
-                `;
-                categoriesContainer.appendChild(section);
-
-                // Add collapsible listener
-                const header = section.querySelector('.category-header');
-                const list = section.querySelector('.category-list');
-                header.addEventListener('click', () => {
-                    header.classList.toggle('collapsed');
-                    list.classList.toggle('collapsed');
-                });
-            });
-        } else {
-            categoriesContainer.innerHTML = `
-                <div class="glass-panel text-center full-width">
-                    <p style="color:var(--text-secondary);">${i18n[currentLang].noCategories}</p>
-                </div>
-            `;
-        }
-
-        // 2. Verified Timeline
-        timeline.innerHTML = '';
-        if (data.timeline && data.timeline.length > 0) {
-            const sortedTimeline = [...data.timeline].sort((a, b) => {
-                const ta = a.time || "";
-                const tb = b.time || "";
-                return ta.localeCompare(tb);
-            });
-
-            sortedTimeline.forEach((item, idx) => {
-                const tlItem = document.createElement('div');
-                const level = item.level || 'info';
-                tlItem.className = `timeline-item timeline-level-${level} animate-in`;
-                tlItem.style.animationDelay = `${idx * 50}ms`;
-
-                const timeStr = item.time || '';
-                const baseSource = item.source || 'Unknown';
-                const sourceStr = channelMap[baseSource] || baseSource;
-                const eventStr = item.event || '';
-
-                const criticalBadge = level === 'critical'
-                    ? `<span class="timeline-critical-badge">${i18n[currentLang].criticalLabel}</span>`
-                    : '';
-
-                tlItem.innerHTML = `
-                    <div class="timeline-time">${timeStr}</div>
-                    <div class="timeline-marker timeline-marker-${level}"></div>
-                    <div class="timeline-content glass-panel-light">
-                        ${criticalBadge}
-                        <span class="timeline-source">${sourceStr}</span>
-                        <p>${eventStr}</p>
-                    </div>
-                `;
-                timeline.appendChild(tlItem);
-            });
-        } else {
-            timeline.innerHTML = `
-                <div class="glass-panel-light" style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">
-                    ${i18n[currentLang].noTimeline}
-                </div>
-            `;
-        }
     };
 
-    // ── Countdown Timer + Auto-refresh ──
+    const renderDashboard = (data) => {
+        setRefreshLoading(false);
+        stopLoadingPhases();
+        setStaleBanner(data.stale === true);
+        loadingState.classList.add('hidden');
+        errorState.classList.add('hidden');
+        dashboardData.style.opacity = '0';
+        dashboardData.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            dashboardData.style.transition = 'opacity 0.3s ease';
+            dashboardData.style.opacity = '1';
+        });
+
+        lastFetchTime = Date.now();
+        updateFreshnessDot();
+
+        renderSummary(data);
+        renderTopSignals(filteredSignals(data.top_signals || []));
+        renderSourcePulse(data.sources_summary || {}, data.source_catalog || []);
+        renderCategories(filterCategories(data.categories || []));
+        renderTimeline(filterTimeline(data.timeline || []));
+    };
+
+    const applyViewState = () => {
+        if (!currentData) return;
+        renderDashboard(currentData);
+    };
+
     const initCountdown = () => {
         const countdownEl = document.getElementById('countdown-timer');
         if (!countdownEl) return;
@@ -407,21 +521,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const next = new Date(now);
             next.setHours(next.getHours() + 1, 0, 0, 0);
             const diffSec = Math.floor((next - now) / 1000);
-
-            // Reset guard after the trigger window
             if (diffSec > 5) firedThisCycle = false;
 
             const mm = String(Math.floor(diffSec / 60)).padStart(2, '0');
             const ss = String(diffSec % 60).padStart(2, '0');
-            countdownEl.textContent = `${i18n[currentLang].nextUpdateIn} ${mm}:${ss}`;
+            countdownEl.textContent = `${getDict().nextUpdateIn} ${mm}:${ss}`;
 
-            // Auto-refresh at the top of the hour
             if (diffSec <= 2 && !firedThisCycle) {
                 firedThisCycle = true;
                 fetchUpdates();
             }
 
-            // Also update freshness dot every tick
             updateFreshnessDot();
         };
 
@@ -429,29 +539,24 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(tick, 1000);
     };
 
-    // ── Copy Summary to Clipboard ──
     const copySummary = async () => {
         const text = document.getElementById('ai-summary-text')?.textContent?.trim();
         if (!text) return;
         const copyIcon = document.getElementById('copy-icon');
         const copyLabel = document.getElementById('copy-label');
         const copyToast = document.getElementById('copy-toast');
-
         try {
             await navigator.clipboard.writeText(text);
-
             if (copyIcon) copyIcon.textContent = '✓';
-            if (copyLabel) copyLabel.textContent = i18n[currentLang].copiedBtn;
-
+            if (copyLabel) copyLabel.textContent = getDict().copiedBtn;
             if (copyToast) {
                 copyToast.textContent = currentLang === 'he' ? '✓ הועתק ללוח' : '✓ Copied to clipboard';
                 copyToast.classList.remove('hidden');
                 setTimeout(() => copyToast.classList.add('hidden'), 2500);
             }
-
             setTimeout(() => {
                 if (copyIcon) copyIcon.textContent = '📋';
-                if (copyLabel) copyLabel.textContent = i18n[currentLang].copyBtn;
+                if (copyLabel) copyLabel.textContent = getDict().copyBtn;
             }, 2500);
         } catch (e) {
             console.warn('Clipboard write failed', e);
@@ -461,7 +566,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const initLiveViewers = async () => {
         const liveViewersEl = document.getElementById('live-viewers');
         const totalViewersEl = document.getElementById('total-viewers');
-
         const sessionId = Math.random().toString(36).substring(2, 15);
 
         const updateLiveCount = async () => {
@@ -471,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 animateCountUp(liveViewersEl, data.live);
             } catch (e) {
-                console.error("Live viewers error", e);
+                console.error('Live viewers error', e);
             }
         };
 
@@ -482,11 +586,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const res = await fetch('https://api.counterapi.dev/v1/FocusNews/views/up');
                 const data = await res.json();
-                if (data && data.count) {
-                    animateCountUp(totalViewersEl, data.count);
-                }
+                if (data && data.count) animateCountUp(totalViewersEl, data.count);
             } catch (e) {
-                console.error("Counter API failed", e);
+                console.error('Counter API failed', e);
             }
         }
     };
@@ -496,10 +598,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedTheme === 'dark') {
             document.documentElement.setAttribute('data-theme', 'dark');
             themeIcon.innerText = '☀️';
-            themeText.innerText = i18n[currentLang].themeLight;
+            themeText.innerText = getDict().themeLight;
         } else {
             themeIcon.innerText = '🌙';
-            themeText.innerText = i18n[currentLang].themeDark;
+            themeText.innerText = getDict().themeDark;
         }
 
         themeToggle.addEventListener('click', () => {
@@ -508,12 +610,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.documentElement.removeAttribute('data-theme');
                 localStorage.setItem('theme', 'light');
                 themeIcon.innerText = '🌙';
-                themeText.innerText = i18n[currentLang].themeDark;
+                themeText.innerText = getDict().themeDark;
             } else {
                 document.documentElement.setAttribute('data-theme', 'dark');
                 localStorage.setItem('theme', 'dark');
                 themeIcon.innerText = '☀️';
-                themeText.innerText = i18n[currentLang].themeLight;
+                themeText.innerText = getDict().themeLight;
             }
         });
 
@@ -527,146 +629,113 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const shareToWhatsapp = () => {
         const url = window.location.href.split('?')[0];
-        let text = currentLang === 'en' ? "📰 *FocusNews - Live Updates:*\n\n" : "📰 *מבזק FocusNews - סיכום השעה:*\n\n";
-
-        // Add summary if exists
+        let text = currentLang === 'en' ? '📰 *FocusNews - Live Signals:*\n\n' : '📰 *FocusNews - אותות חמים:*\n\n';
         const summaryText = document.getElementById('ai-summary-text');
-        if (summaryText && summaryText.innerText.trim() !== "") {
-            const summaryTitle = currentLang === 'en' ? "Overview" : "מבט על";
+        if (summaryText && summaryText.innerText.trim() !== '') {
+            const summaryTitle = currentLang === 'en' ? 'Overview' : 'מבט על';
             text += `*🌎 ${summaryTitle}:*\n${summaryText.innerText.trim()}\n\n`;
         }
 
-        const timelineDivs = document.querySelectorAll('.timeline-item');
-        let hasTimeline = false;
+        const topSignalCards = document.querySelectorAll('.signal-card h4');
+        topSignalCards.forEach((card, index) => {
+            if (index < 3) text += `• ${card.innerText.trim()}\n`;
+        });
 
-        if (timelineDivs.length > 0) {
-            const firstItemText = timelineDivs[0].innerText.trim();
-            if (!firstItemText.includes("No actionable events") && !firstItemText.includes("לא זוהו אירועים")) {
-                text += currentLang === 'en' ? "*🔥 Key Events:*\n" : "*🔥 אירועים בולטים:*\n";
-                let eventCount = 0;
-                timelineDivs.forEach(tli => {
-                    if (eventCount < 4 && tli.querySelector('.timeline-time') && tli.querySelector('p')) {
-                        const time = tli.querySelector('.timeline-time').innerText;
-                        const eventContent = tli.querySelector('p').innerText;
-                        if (eventContent) {
-                            text += `🕒 ${time} - ${eventContent}\n`;
-                            eventCount++;
-                        }
-                    }
-                });
-                text += "\n";
-                hasTimeline = true;
-            }
-        }
-
-        if (!hasTimeline) {
-            const categories = document.querySelectorAll('.category-section');
-            let itemCount = 0;
-            categories.forEach(cat => {
-                const h3 = cat.querySelector('h3');
-                if (!h3) return;
-                const title = h3.innerText;
-                const items = cat.querySelectorAll('li');
-                if (items.length > 0 && !items[0].innerText.includes(i18n[currentLang].noEvents) && itemCount < 3) {
-                    const itemContent = items[0].querySelector('.item-content') ? items[0].querySelector('.item-content').innerText : items[0].innerText;
-                    text += `*${title.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '').trim()}*\n- ${itemContent}\n\n`;
-                    itemCount++;
-                }
-            });
-        }
-
-        text += currentLang === 'en' ? `🔗 Read full updates live: ${url}` : `🔗 קראו את העדכונים המלאים: ${url}`;
-
-        const encodedText = encodeURIComponent(text);
-        window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+        text += `\n${currentLang === 'en' ? '🔗 Full dashboard:' : '🔗 לדשבורד המלא:'} ${url}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     };
 
-    // ── Visibility API (Tab Title Notification) ──
-    document.addEventListener("visibilitychange", () => {
+    document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-            document.title = i18n[currentLang].originalTab || "FocusNews";
+            document.title = getDict().originalTab || 'FocusNews';
         }
     });
 
-    // ── Back to Top Button ──
-    const backToTopBtn = document.createElement("button");
-    backToTopBtn.id = "back-to-top";
-    backToTopBtn.className = "icon-btn hidden";
-    backToTopBtn.style.position = "fixed";
-    backToTopBtn.style.bottom = "80px";
-    backToTopBtn.style.right = "20px";
-    backToTopBtn.style.zIndex = "1000";
-    backToTopBtn.style.background = "var(--accent-blue)";
-    backToTopBtn.style.color = "#fff";
-    backToTopBtn.style.padding = "10px 15px";
-    backToTopBtn.style.boxShadow = "var(--shadow-soft)";
-    backToTopBtn.innerHTML = `<span>${i18n[currentLang].backToTop || '⏫ Back to Top'}</span>`;
+    const backToTopBtn = document.createElement('button');
+    backToTopBtn.id = 'back-to-top';
+    backToTopBtn.className = 'icon-btn hidden';
+    backToTopBtn.style.position = 'fixed';
+    backToTopBtn.style.bottom = '80px';
+    backToTopBtn.style.right = '20px';
+    backToTopBtn.style.zIndex = '1000';
+    backToTopBtn.style.background = 'var(--accent-blue)';
+    backToTopBtn.style.color = '#fff';
+    backToTopBtn.style.padding = '10px 15px';
+    backToTopBtn.style.boxShadow = 'var(--shadow-soft)';
+    backToTopBtn.innerHTML = `<span>${getDict().backToTop || '⏫ Back to Top'}</span>`;
     document.body.appendChild(backToTopBtn);
 
-    backToTopBtn.style[document.documentElement.dir === 'rtl' ? 'left' : 'right'] = '20px';
+    const updateBackToTopAlignment = () => {
+        backToTopBtn.style.left = '';
+        backToTopBtn.style.right = '';
+        backToTopBtn.style[document.documentElement.dir === 'rtl' ? 'left' : 'right'] = '20px';
+    };
 
-    window.addEventListener("scroll", () => {
-        if (window.scrollY > 400) {
-            backToTopBtn.classList.remove("hidden");
-        } else {
-            backToTopBtn.classList.add("hidden");
-        }
+    updateBackToTopAlignment();
+
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 400) backToTopBtn.classList.remove('hidden');
+        else backToTopBtn.classList.add('hidden');
     });
 
-    backToTopBtn.addEventListener("click", () => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+    backToTopBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    // ── Pull to Refresh ──
     let touchStartY = 0;
     let touchEndY = 0;
     let isPulling = false;
 
-    document.addEventListener('touchstart', e => {
+    document.addEventListener('touchstart', (e) => {
         if (window.scrollY === 0) {
             touchStartY = e.changedTouches[0].screenY;
             isPulling = true;
         }
-    }, {passive: true});
+    }, { passive: true });
 
-    document.addEventListener('touchmove', e => {
+    document.addEventListener('touchmove', (e) => {
         if (!isPulling) return;
         touchEndY = e.changedTouches[0].screenY;
-        // Optionally add visual feedback here if we wanted
-    }, {passive: true});
+    }, { passive: true });
 
     document.addEventListener('touchend', () => {
         if (!isPulling) return;
-        if (touchEndY > touchStartY + 150) { // arbitrary 150px pull threshold
-            fetchUpdates();
-        }
+        if (touchEndY > touchStartY + 150) fetchUpdates();
         isPulling = false;
     });
 
-    // ── Event Listeners ──
-    if (shareWhatsappBtn) {
-        shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
-    }
+    filterSelector.value = currentFilter;
+    topicSelector.value = currentTopic;
+    viewSelector.value = currentView;
 
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', fetchUpdates);
-    }
+    filterSelector.addEventListener('change', () => {
+        currentFilter = filterSelector.value;
+        localStorage.setItem('filterProfile', currentFilter);
+        fetchUpdates();
+    });
 
-    if (copySummaryBtn) {
-        copySummaryBtn.addEventListener('click', copySummary);
-    }
+    topicSelector.addEventListener('change', () => {
+        currentTopic = topicSelector.value;
+        localStorage.setItem('topicFilter', currentTopic);
+        applyViewState();
+    });
+
+    viewSelector.addEventListener('change', () => {
+        currentView = viewSelector.value;
+        localStorage.setItem('viewMode', currentView);
+        applyViewState();
+    });
+
+    if (shareWhatsappBtn) shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
+    if (refreshBtn) refreshBtn.addEventListener('click', fetchUpdates);
+    if (copySummaryBtn) copySummaryBtn.addEventListener('click', copySummary);
 
     const retryBtn = document.getElementById('retry-btn');
-    if (retryBtn) {
-        retryBtn.addEventListener('click', fetchUpdates);
-    }
+    if (retryBtn) retryBtn.addEventListener('click', fetchUpdates);
 
     const historySelector = document.getElementById('history-selector');
-    if (historySelector) {
-        historySelector.addEventListener('change', fetchUpdates);
-    }
+    if (historySelector) historySelector.addEventListener('change', fetchUpdates);
 
-    // ── Initial load ──
     updateUIText();
     initThemeAndLang();
     initLiveViewers();

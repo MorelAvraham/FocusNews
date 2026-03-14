@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add api/cron.py api/updates.py)",
+      "Bash(git commit:*)",
+      "Bash(git push origin main)",
+      "Bash(git add vercel.json)",
+      "Bash(xargs -I{} git show --format=\"%H %s%n%b\" -s {})",
+      "Bash(git filter-branch -f --msg-filter 'sed \"\"/Co-Authored-By: Claude/d; /^[[:space:]]*$/{ N; /^\\\\n$/d; }\"\"' HEAD~2..HEAD)",
+      "Bash(GIT_DIR=\"c:/Users/morel/שולחן העבודה/Projects/FocusNews/.git\" git worktree prune)",
+      "Read(//c/Users/morel/**)"
+    ]
+  }
+}

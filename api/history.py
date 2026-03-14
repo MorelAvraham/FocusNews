@@ -9,6 +9,9 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         query_components = parse_qs(urlparse(self.path).query)
         lang = query_components.get('lang', ['he'])[0]
+        filter_name = query_components.get('filter', ['high'])[0]
+        if filter_name not in ('high', 'balanced', 'fast'):
+            filter_name = 'high'
         try:
             hours_ago = int(query_components.get('hours_ago', ['1'])[0])
         except ValueError:
@@ -29,10 +32,14 @@ class handler(BaseHTTPRequestHandler):
             current_ts = int(datetime.now(timezone.utc).timestamp())
             target_ts = current_ts - (hours_ago * 3600)
             
-            key = f"news_history_{lang}"
+            key = f"news_history_{lang}_{filter_name}"
             
             # Search within a 1-hour window (+/- 3600s) to find the closest record
             records = r.zrangebyscore(key, target_ts - 3600, target_ts + 3600, withscores=True)
+
+            if not records and filter_name == 'high':
+                legacy_key = f"news_history_{lang}"
+                records = r.zrangebyscore(legacy_key, target_ts - 3600, target_ts + 3600, withscores=True)
             
             if not records:
                 if lang == 'en':

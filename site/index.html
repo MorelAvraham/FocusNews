@@ -76,6 +76,35 @@
                 <span id="freshness-dot" title="" style="display:none;"></span>
                 <span id="countdown-timer" style="color:var(--accent-orange); font-weight:bold; font-size:0.85rem;"></span>
             </div>
+
+            <section class="signal-control-strip">
+                <div class="control-chip-group">
+                    <label class="control-label" for="filter-selector">רמת סינון</label>
+                    <select id="filter-selector" class="icon-btn history-select">
+                        <option value="high">אמינות גבוהה</option>
+                        <option value="balanced">מאוזן</option>
+                        <option value="fast">מהיר</option>
+                    </select>
+                </div>
+                <div class="control-chip-group">
+                    <label class="control-label" for="topic-selector">נושא</label>
+                    <select id="topic-selector" class="icon-btn history-select">
+                        <option value="all">הכול</option>
+                        <option value="security">ביטחון</option>
+                        <option value="politics">פוליטיקה</option>
+                        <option value="economy">כלכלה</option>
+                        <option value="general">כללי</option>
+                    </select>
+                </div>
+                <div class="control-chip-group">
+                    <label class="control-label" for="view-selector">מצב תצוגה</label>
+                    <select id="view-selector" class="icon-btn history-select">
+                        <option value="verified">מאומת</option>
+                        <option value="all">כל האותות</option>
+                        <option value="radar">רדאר מוקדם</option>
+                    </select>
+                </div>
+            </section>
         </header>
 
         <main id="dashboard-content" class="dashboard-grid">
@@ -128,6 +157,18 @@
                     <span id="stale-msg"></span>
                 </div>
 
+                <section class="wow-grid">
+                    <div class="glass-panel signal-panel">
+                        <h3><i class="icon">⚡</i> <span id="top-signals-title">Top Signals Now</span></h3>
+                        <div id="top-signals-container" class="signal-cards-grid"></div>
+                    </div>
+                    <div class="glass-panel signal-panel">
+                        <h3><i class="icon">📡</i> <span id="source-pulse-title">Source Pulse</span></h3>
+                        <div id="source-pulse-summary" class="pulse-summary"></div>
+                        <div id="source-pulse-tags" class="source-tags source-pulse-tags"></div>
+                    </div>
+                </section>
+
                 <div id="ai-summary-container" class="glass-panel text-center full-width hidden mb-4" style="position:relative;">
                     <h3 style="justify-content: center;"><i class="icon">🤖</i> <span id="summary-title">סיכום AI (מבט
                             על)</span></h3>
@@ -154,17 +195,8 @@
         <footer class="glass-panel main-footer mt-4">
             <div class="footer-content" style="border-bottom:none; margin-bottom:0; padding-bottom:0;">
                 <div class="monitored-sources" style="width:100%; text-align:center;">
-                    <h4 id="monitored-sources-title">מקורות מנוטרים <span>(8/8 פעילים)</span></h4>
-                    <div class="source-tags">
-                        <span>אבו עלי אקספרס</span>
-                        <span>עמית סגל</span>
-                        <span>מבזק אפל</span>
-                        <span>זיו רובינשטיין</span>
-                        <span>אבו צאלח הדסק הערבי</span>
-                        <span>חדשות 301 העולם הערבי</span>
-                        <span>GLOBAL ANALYST</span>
-                        <span>ערוץ החדשות 8200</span>
-                    </div>
+                    <h4 id="monitored-sources-title">מקורות מנוטרים <span>(0/0 פעילים)</span></h4>
+                    <div id="monitored-sources-tags" class="source-tags"></div>
                 </div>
             </div>
 
